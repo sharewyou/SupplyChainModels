@@ -1,0 +1,90 @@
+#Create pivot table and output to excel
+
+#standardize column names so that we can feed into model 
+# Define a dictionary with the column name changes
+new_column_names = {
+    'TRACKING_NUMBER': 'Tracking#',
+    'SHIP_DATE': 'created_on',
+    'OLD_SERVICE': 'Service',
+    'ACTUAL_WEIGHT': 'weight',
+    'ZONE': 'zone',
+    'ZIP_CODE': 'Zip Code',
+    'RESIDENTIAL_FLAG':'Residential',  
+    'BILLED_WEIGHT': 'Billed Weight',
+    'GIRTH_AND_L': 'Girth',
+    'DAS':'DAS Charges',
+    'DAS_CATEGORY':'DAS',    
+    'FRT': 'FREIGHT',
+    'PUB_BILLED_WEIGHT': 'Published Weight',
+    'TOTAL':'CLIENT TOTAL', 
+    'PUB_FRT': 'PUB_FREIGHT',  
+    'PUB_TOTAL': 'PUBLISHED_PRICE' 
+}
+
+
+# Rename the columns using the dictionary
+tbl_rating_7 = tbl_rating_7.rename(columns=new_column_names)
+#tbl_rating_7['created_on'] = tbl_rating_7['created_on'].dt.date
+tbl_rating_7['created_on'] = pd.to_datetime(tbl_rating_7['created_on'])
+
+# re-order the columns names for better visualization
+tbl_rating_7 = tbl_rating_7.reindex(columns=['Custid', 'order_id', 'REFERENCE', 'company', 'contact', 'created_on', 'Tracking#', 'Service',
+       'weight', 'zone', 'L', 'W', 'H', 'Residential','Zip Code', 'Billed Weight', 'Girth', 'DAS', 'AHS', 'FREIGHT', 'FSC', 'CLIENT TOTAL', 'Published Weight', 'PUB_FREIGHT', 'PUB_FSC', 'PUBLISHED_PRICE', 'SAVINGS', 'SAVINGS %'])
+tbl_rating_7.reset_index(drop=True, inplace=True)
+
+
+# Group by 'Company' and 'Order-ID', then sum 'Total'
+aggregation_functions = {'Tracking#': 'count', 'PUBLISHED_PRICE':'sum', 'CLIENT TOTAL': 'sum', 'SAVINGS': 'sum'} 
+
+# Group by 'Reference' and 'Company', then aggregate using sum and count
+tbl_rating_7_pivot = tbl_rating_7.groupby(['REFERENCE', 'company']).agg(aggregation_functions).reset_index()
+
+# Rename the columns for clarity
+tbl_rating_7_pivot.columns = ['REFERENCE', 'company', 'Package Count', 'Published Pricing', 'Nature Planet Spend', 'Parcel Savings']
+
+# Concatenate the total row to the pivot table
+tbl_rating_7_pivot['Savings %'] = tbl_rating_7_pivot['Parcel Savings']/tbl_rating_7_pivot['Published Pricing']
+tbl_rating_7_pivot['Average Cost (Published)'] = tbl_rating_7_pivot['Published Pricing']/tbl_rating_7_pivot['Package Count']
+tbl_rating_7_pivot['Average Cost (Client Pricing)'] = tbl_rating_7_pivot['Nature Planet Spend']/tbl_rating_7_pivot['Package Count']
+tbl_rating_7_pivot['Savings (Per Pkg)'] = tbl_rating_7_pivot['Average Cost (Published)'] - tbl_rating_7_pivot['Average Cost (Client Pricing)']
+tbl_rating_7_pivot['% Savings'] = tbl_rating_7_pivot['Savings (Per Pkg)']/tbl_rating_7_pivot['Average Cost (Published)']
+
+
+# Calculate the total row
+total_row = pd.DataFrame({
+    'REFERENCE': ['Grand Total'],
+    'company': [''],
+    'Package Count': [tbl_rating_7_pivot['Package Count'].sum()],
+    'Published Pricing': [tbl_rating_7_pivot['Published Pricing'].sum()],
+    'Nature Planet Spend': [tbl_rating_7_pivot['Nature Planet Spend'].sum()],
+    'Parcel Savings': [tbl_rating_7_pivot['Parcel Savings'].sum()],
+    'Savings %': [tbl_rating_7_pivot['Savings %'].mean()],
+    'Average Cost (Published)': [tbl_rating_7_pivot['Average Cost (Published)'].mean()],
+    'Average Cost (Client Pricing)': [tbl_rating_7_pivot['Average Cost (Client Pricing)'].mean()],
+    'Savings (Per Pkg)': [tbl_rating_7_pivot['Savings (Per Pkg)'].mean()],
+    '% Savings': [tbl_rating_7_pivot['% Savings'].mean()]
+})
+
+tbl_rating_7_pivot = pd.concat([tbl_rating_7_pivot, total_row], ignore_index=True)
+tbl_rating_7_pivot['Savings %'] = tbl_rating_7_pivot['Savings %'].apply(lambda x: f"{x * 100:.2f}%")
+tbl_rating_7_pivot['% Savings'] = tbl_rating_7_pivot['% Savings'].apply(lambda x: f"{x * 100:.2f}%")
+
+tbl_rating_7_pivot['Average Cost (Published)'] = round(tbl_rating_7_pivot['Average Cost (Published)'],2)
+tbl_rating_7_pivot['Average Cost (Client Pricing)'] = round(tbl_rating_7_pivot['Average Cost (Client Pricing)'],2)
+tbl_rating_7_pivot['Savings (Per Pkg)'] = round(tbl_rating_7_pivot['Savings (Per Pkg)'],2)
+
+# Create an Excel writer object
+excel_writer = pd.ExcelWriter('Nature Planet Daily Rerate File XX-XX-XXXX.xlsx', engine='xlsxwriter')
+
+# Write DataFrame 1 to the first sheet
+tbl_rating_7.to_excel(excel_writer, sheet_name='Rerates', index=False)
+
+# Write DataFrame 2 to the second sheet
+tbl_rating_7_pivot.to_excel(excel_writer, sheet_name='Dashboard', index=False)
+
+# Save the Excel file
+excel_writer.save()
+
+
+
+
