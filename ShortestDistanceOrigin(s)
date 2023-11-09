@@ -1,0 +1,57 @@
+# Get the facility or a combination of facilities that travels the shortest distance
+
+import pandas as pd
+import itertools
+
+# Replace with your actual column names representing the 12 facilities
+facility_columns = ['ZONE_02038', 'ZONE_08873', 'ZONE_38141', 'ZONE_75041', 'ZONE_90640', '', '', '']
+
+def find_min_distance_facilities(tbl_BP, facility_columns, num_facilities):
+    min_distance = float('inf')
+    best_combinations = []  # Corrected name here
+    
+    # Generate all possible combinations of facilities
+    for comb in itertools.combinations(facility_columns, num_facilities):
+        # Calculate the total distance for the current combination of facilities
+        total_distance = tbl_BP[list(comb)].min(axis=1).sum()
+        
+        # Update the minimum distance and the best combination of facilities if current total_distance is smaller
+        if total_distance < min_distance:
+            min_distance = total_distance
+            best_combinations = [comb]  # Start a new list with the current combination
+        elif total_distance == min_distance:  # Handle equal distances
+            best_combinations.append(comb)
+            
+    return best_combinations, min_distance  # Corrected name here
+
+
+# If you want to minimize the distance by selecting only 1 facility or 10 facilities, change the num_facilities argument accordingly.
+best_combination, min_distance = find_min_distance_facilities(tbl_BP, facility_columns, 1)  # For 1 facility
+print(f"The best combination of facilities is {best_combination} with a minimum total distance of {min_distance}")
+
+
+# To find the 2 facilities that can minimize the total distance travelled, call the function with num_facilities=3
+best_combination, min_distance = find_min_distance_facilities(tbl_BP, facility_columns, 2)
+print(f"The best combination of facilities is {best_combination} with a minimum total distance of {min_distance}")
+
+
+# To find the 3 facilities that can minimize the total distance travelled, call the function with num_facilities=3
+best_combination, min_distance = find_min_distance_facilities(tbl_BP, facility_columns, 3)
+print(f"The best combination of facilities is {best_combination} with a minimum total distance of {min_distance}")
+
+
+# To find the 4 facilities that can minimize the total distance travelled, call the function with num_facilities=3
+best_combination, min_distance = find_min_distance_facilities(tbl_BP, facility_columns, 4)
+print(f"The best combination of facilities is {best_combination} with a minimum total distance of {min_distance}")
+
+
+# To find the 5 facilities that can minimize the total distance travelled, call the function with num_facilities=3
+best_combination, min_distance = find_min_distance_facilities(tbl_BP, facility_columns, 5)
+print(f"The best combination of facilities is {best_combination} with a minimum total distance of {min_distance}")
+
+
+# To find the 6 facilities that can minimize the total distance travelled, call the function with num_facilities=3
+best_combination, min_distance = find_min_distance_facilities(tbl_BP, facility_columns, 6)
+print(f"The best combination of facilities is {best_combination} with a minimum total distance of {min_distance}")
+
+
