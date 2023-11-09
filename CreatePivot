@@ -1,4 +1,4 @@
-#Create pivot table and output to excel
+#Use Python to create pivot table and output to excel
 
 #standardize column names so that we can feed into model 
 # Define a dictionary with the column name changes
