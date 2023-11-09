@@ -1,6 +1,6 @@
 # Rate_Automation
 
-**This model will rate packages under the actual services shown in PLD**
+**This model will rate packages for all clients under UPS, DHL, and USPS.**
 
 *********Structure & Input*********
 
@@ -286,7 +286,7 @@ FreightCharge = FreightCharge[(FreightCharge['Version'] == 2023)]
 **Section 2. Read in all other input tables (and Re-format)**
 
 # ********** Read Doc. 2 **********
-ClientCharge = pd.read_excel('C:\\Users\\sliu\\BD\\re-rate_model\\ClientCharge_2023.xlsx')
+ClientCharge = pd.read_excel('C:\\xx\\xx\\xx\\xx\\ClientCharge_2023.xlsx')
 
 # ********** Read Doc. 3 **********
 xls = pd.ExcelFile('FuelSurcharge_weekly.xlsx')
@@ -333,7 +333,7 @@ ZipToZone = pd.concat([dfs['02038_Outbound'], dfs['08873_Outbound'], dfs['21226_
 
 
 # ********** Read Doc. 5 **********
-ZipToDas = pd.read_excel('C:\\Users\\sliu\\BD\\re-rate_model\\ZipToDas_2023.xlsx')
+ZipToDas = pd.read_excel('C:\\xx\\xx\\xx\\xx\\ZipToDas_2023.xlsx')
 
 **Section 3. Re-format PLD and rate**
 
@@ -772,7 +772,7 @@ tbl_BP.loc[condition, 'PublishedFreight'] = np.nan
 
 # HandleJohnnie-o flat rate special case
 tbl_BP.loc[
-    (tbl_BP['CustomerID'] == 9019) &
+    (tbl_BP['CustomerID'] == xx) &
     (tbl_BP['ServiceCode'].isin(['RED', 'REDS'])) &
     (tbl_BP['CustomerBilledWeightLb'] <= 5) &
     (tbl_BP['Zone'] <= 8),
@@ -781,7 +781,7 @@ tbl_BP.loc[
 
 
 tbl_BP.loc[
-    (tbl_BP['CustomerID'] == 9019) &
+    (tbl_BP['CustomerID'] == xx) &
     (tbl_BP['ServiceCode'].isin(['2DAM','BLUE'])) &
     (tbl_BP['CustomerBilledWeightLb'] <= 5) &
     (tbl_BP['Zone'] <= 8),
@@ -967,10 +967,6 @@ tbl_BP = tbl_BP.rename(columns={'TempServiceCode': 'ServiceCode'})
 
 **Add dhl accessorials**
 
-#dhl_cubic_inch_threshold_1 = 1728/ dhl_cubic_inch_threshold_2 = 3456/ dhl_weight_threshold = 1 /dhl_g_and_l_threshold_1 = 50
-#dhl_g_and_l_threshold_2 = 84/ dhl_max_l_threshold_1 = 22/ dhl_max_l_threshold_2 = 27/ dhl_max_l_threshold_3 = 30
-#dates = ['2023-01-01', '2023-09-30', '2023-10-01', '2023-12-31']
-#nqd_dhl_date_1, nqd_dhl_date_2, nqd_dhl_date_3, nqd_dhl_date_4 = [pd.to_datetime(date) for date in dates]
 
 # Mask for specific ServiceCode values
 service_codes = ["DHLG", "DHLG<1", "DHLE", "DHLE<1", "DHLEM"]
@@ -1175,27 +1171,27 @@ tbl_BP = tbl_BP.drop(columns=['CompanyID', 'Price'])
 
 
 
-# Handle JO special case
+# Handle xx special case
 tbl_BP.loc[
-    (tbl_BP['CustomerID'] == 9019) &
+    (tbl_BP['CustomerID'] == xx) &
     (tbl_BP['ServiceCode'].isin(['RED','REDS'])) &
-    (tbl_BP['CustomerFreight'] == 27),
+    (tbl_BP['CustomerFreight'] == xx),
     'CustomerTotal'
-] = 27
+] = xx
 
 
 tbl_BP.loc[
-    (tbl_BP['CustomerID'] == 9019) &
+    (tbl_BP['CustomerID'] == xx) &
     (tbl_BP['ServiceCode'].isin(['2DAM','BLUE'])) &
-    (tbl_BP['CustomerFreight'] == 17),
+    (tbl_BP['CustomerFreight'] == xx),
     'CustomerTotal'
-] = 17
+] = xx
 
 
 tbl_BP.loc[
-    (tbl_BP['CustomerID'] == 9019) &
+    (tbl_BP['CustomerID'] == xx) &
     (tbl_BP['ServiceCode'].isin(['RED','REDS'])) &
-    (tbl_BP['CustomerFreight'] == 27),
+    (tbl_BP['CustomerFreight'] == xx),
     ['CustomerRes', 'CustomerDas', 'CustomerAhs', 'CustomerFsc']
 ] = [0, 0, 0, 0]
 
@@ -1203,7 +1199,7 @@ tbl_BP.loc[
 tbl_BP.loc[
     (tbl_BP['CustomerID'] == 9019) &
     (tbl_BP['ServiceCode'].isin(['2DAM','BLUE'])) &
-    (tbl_BP['CustomerFreight'] == 17),
+    (tbl_BP['CustomerFreight'] == xx),
     ['CustomerRes', 'CustomerDas', 'CustomerAhs', 'CustomerFsc']
 ] = [0, 0, 0, 0]
 
@@ -1248,16 +1244,11 @@ tbl_BP[cols_to_format_1] = tbl_BP[cols_to_format_1].applymap(lambda x: '${:,.2f}
 tbl_BP[cols_to_format_2] = tbl_BP[cols_to_format_2].applymap(lambda x: '{:.2%}'.format(x) if pd.notna(x) else x)
 
 
-**Section 4. Analysis-pending**
-
-""""""""""
+**Section 4. Analysis-WIP**
 
 filtered_df = tbl_BP[tbl_BP['Service'].str.contains('UPS', case=False, na=False)]
 
 # only ups
-# daily report is restricted to: only shipper for Jacobson: BARJACOBSON_GBM
-# ndd, vibram, make a fort, np, blueshift everything, for JO, it is not enough in snowflake.     
-
 
 # Group by 'Company' and 'Order-ID', then sum 'Total'
 aggregation_functions = {'TrackingNumber': 'count', 'PublishedTotal':'sum', 'CustomerTotal': 'sum', 'Savings': 'sum'} 
@@ -1315,15 +1306,6 @@ filtered_df_pivot.to_excel(excel_writer, sheet_name='Dashboard', index=False)
 # Save the Excel file
 excel_writer.save()
 
-# Blueshift
-# Jacobson
-# Johnnie-o in 1 report
-# NDD
-# Vibram
-# Nature Planet
-# Make a Fort
-
-
 tbl_BP.to_csv('test.csv')
 
 
@@ -1331,16 +1313,7 @@ tbl_BP.to_csv('test.csv')
 
 
 
-
-
-
 **back-up Note below**
-
-
-#df.loc[df['TrackingNumber'] == '"9261299999158851316230']
-
-df.to_csv('test.csv')
-
 
 '''''''''''
 #The rounding difference between python (new model) and excel (current model) will exist for some time until it has become a considerable issue. It is hard but not impossible to fix. 
@@ -1352,17 +1325,6 @@ round(2.9925,3) = 2.993
 round(2.99925,4) = 2.9992
 round(2.999925,5) = 2.9993
 round(2.9999925,6) = 2.999992
-
-The estimated rate difference in the worst-case scenario: 
-roundup with resi charge $2.93 in excel but $2.92 in python will bring $0.02 difference in total charge of a package (margin and fsc added so that $0.01 turns to around $0.02). The worst case scenario saw so far, the Johnnie-o PLD 2023 YTD 130k ups ground package has a total of $800 difference between excel and python rerate result.     
-
-# Convert columns 'L', 'W', and 'H' to numeric
-tbl_BP[['L', 'W', 'H']] = tbl_BP[['L', 'W', 'H']].apply(pd.to_numeric)
-
-# ROUNDUP equivalent in Python for 2 decimal places
-tbl_BP['L'] = tbl_BP['L'].apply(lambda x: np.ceil(x * 100) / 100)
-tbl_BP['W'] = tbl_BP['W'].apply(lambda x: np.ceil(x * 100) / 100)
-tbl_BP['H'] = tbl_BP['H'].apply(lambda x: np.ceil(x * 100) / 100)
 
 ''''''''''''''
 
