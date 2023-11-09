@@ -1,0 +1,114 @@
+# Perform Exponential Smoothing for Level, Trend, and Seasonality
+
+historyMay2023_3 = historyMay2023[(historyMay2023['Customer #'] == xxxx)]
+historyMay2023_3 = round(historyMay2023_3.groupby(['Customer #','Customer', 'year_month'])['Sell'].sum(),0).reset_index()
+
+# Convert 'YearMonth' column to datetime format
+# historyMay2023_1['year_month'] = pd.to_datetime(historyMay2023_1['year_month'])
+# Convert 'YearMonth' column to timestamp format
+historyMay2023_3['year_month'] = historyMay2023_3['year_month'].dt.to_timestamp()
+
+# Sort the DataFrame by 'YearMonth' column
+historyMay2023_3 = historyMay2023_3.sort_values('year_month')
+
+
+
+
+# Convert 'Date' column to datetime and set it as the DataFrame index
+historyMay2023_3['year_month'] = pd.to_datetime(historyMay2023_3['year_month'])
+historyMay2023_3.set_index('year_month', inplace=True)
+
+# Perform Exponential Smoothing for Level and Monthly Seasonality
+model = ExponentialSmoothing(historyMay2023_3['Sell'], trend='add', seasonal='add', seasonal_periods=12).fit()
+#model = ExponentialSmoothing(historyMay2023_1_1['Sell'], seasonal='add', seasonal_periods=12).fit()
+
+# Make monthly forecasts for the next 12 months
+forecast = model.predict(start=historyMay2023_3.index[-1] + pd.DateOffset(months=-6), end=historyMay2023_3.index[-1] + pd.DateOffset(months=16))
+
+# Create a new DataFrame for the forecasted values
+forecast_df = pd.DataFrame({'Date': forecast.index, 'FORECAST': forecast.values})
+forecast_df.set_index('Date', inplace=True)
+
+forecast_df = forecast_df.reset_index()
+historyMay2023_3 = historyMay2023_3.reset_index()
+
+# Combine the actuals and forecast
+combined_df_3 = historyMay2023_3.merge(forecast_df[["Date", "FORECAST"]], left_on=['year_month'], right_on=['Date'], how='outer')
+
+# Consolidate the 2 date columns into 1
+combined_df_3['DATE'] = combined_df_3['year_month'].combine_first(combined_df_3['Date'])
+combined_df_3 = combined_df_3.drop(['Date','year_month'], axis=1)
+
+# Round the number into integer
+combined_df_3['FORECAST'] = round(combined_df_3['FORECAST'],0)
+
+# fill the blank customer name and id
+combined_df_3['Customer #'] = combined_df_3['Customer #'].fillna(method='ffill')
+combined_df_3['Customer'] = combined_df_3['Customer'].fillna(method='ffill')
+
+# rename the column
+combined_df_3.rename(columns={'Customer #': 'CUST_ID', 'Customer': 'CUSTOMER',  'Sell': 'SELL'}, inplace=True)
+
+# Reorganize the column order
+desired_order = ['CUST_ID', 'CUSTOMER', 'DATE', 'SELL', 'FORECAST']
+
+# Reorder the columns
+combined_df_3 = combined_df_3[desired_order]
+
+# add MAPE and MPE columns
+combined_df_3['MAPE'] = (abs(combined_df_3['SELL'] - combined_df_3['FORECAST']))/combined_df_3['SELL']
+combined_df_3['MPE'] = (combined_df_3['SELL'] - combined_df_3['FORECAST'])/combined_df_3['SELL']
+
+
+
+
+# add a multipler to the forecast to create adjusted forecast. This is only for reference. 
+def adjust_forecast_by_multiplier(forecast, multiplier):
+    adjusted_forecast = forecast * multiplier
+    return adjusted_forecast
+
+def calculate_mape(actual, forecast):
+    absolute_error = np.abs(actual - forecast)
+    percentage_error = absolute_error / np.abs(actual)
+    mape = np.mean(percentage_error) * 100
+    return mape
+
+actual_values = combined_df_3['SELL']  # Replace with your actual values column
+forecast_values = combined_df_3['FORECAST']  # Replace with your forecast values column
+
+multipliers = np.linspace(0.5, 1.5, num=200)  # Adjust the range and granularity of multipliers as needed
+best_mape = np.inf
+best_multiplier = 1.0
+
+for multiplier in multipliers:
+    adjusted_forecast = adjust_forecast_by_multiplier(forecast_values, multiplier)
+    mape = calculate_mape(actual_values, adjusted_forecast)
+    
+    if mape < best_mape:
+        best_mape = mape
+        best_multiplier = multiplier
+
+adjusted_forecast = adjust_forecast_by_multiplier(forecast_values, best_multiplier)
+
+# Add adjusted forecast, MAPE, and MPE columns to the DataFrame
+combined_df_3['ADJ_FORECAST'] = round(adjusted_forecast,0)
+combined_df_3['ADJ_MAPE'] = abs(combined_df_3['SELL'] - combined_df_3['ADJ_FORECAST'])/combined_df_3['SELL']
+combined_df_3['ADJ_MPE'] = (combined_df_3['SELL'] - combined_df_3['ADJ_FORECAST'])/combined_df_3['SELL']
+
+
+
+
+# Plot the original data and the adjusted forecast
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(10, 6))
+plt.plot(combined_df_3.index, combined_df_3['SELL'], label='Actual')
+plt.plot(combined_df_3.index, combined_df_3['FORECAST'], label='Forecast')
+plt.xlabel('DATE')
+plt.ylabel('SELL')
+plt.title('Monthly Forecast using Exponential Smoothing')
+plt.legend()
+plt.show()
+
+
+
