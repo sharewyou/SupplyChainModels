@@ -3,31 +3,19 @@
 **This model will rate packages for all clients under UPS, DHL, and USPS.**
 
 *********Structure & Input*********
-
 **Structure**:
-
 Section 1. Read in Freight Rates and Re-format 
-
 Section 2. Read in other input tables and Re-format
-
 Section 3. Re-format PLD and rate
-
 Section 4. Analysis
 
 **Input tables**:
-
 Doc. 1. FreightCharge_2023: freight rate cards (insert updated version once a year)
-
 Doc. 2. ClientCharge_2023: client rate and parameters (insert newer version when needed)
-
 Doc. 3. FuelSurcharge_weekly: fuel surcharge rate (update once a week)
-
 Doc. 4. ZipToZone: get zone from destination zip based on different facilities
-
-Doc. 5. ZipToDas_2023: a table to assign the type of DAS Category (insert newer version once a year)
-    
+Doc. 5. ZipToDas_2023: a table to assign the type of DAS Category (insert newer version once a year) 
 Doc. 6. PLD: package level detail as an input table
-
 
 **FreightCharge note**
 
@@ -56,7 +44,6 @@ Doc. 6. PLD: package level detail as an input table
 | DHL/USPS/MI | All | Company Cost / (1-Margin%) | 
 
 **Update the code in case you do not want to Round**
-
 
 
 *********Parameter Set Up*********
