@@ -1,0 +1,59 @@
+#This code gets State and Region based on the Zip Code. 
+
+import pandas as pd
+from sklearn.tree import DecisionTreeClassifier, export_graphviz
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+import pydotplus
+from IPython.display import Image
+from sklearn.tree import plot_tree
+import matplotlib.pyplot as plt
+
+df = pd.read_excel('C:\\xx\\xx\\xx\\xx\\xx.xlsx')
+df_test = df.copy()
+df_test.info()
+
+# fill the 3 and 4 digits zip to 5 digits
+df_test['ZipCode'] = df_test['ZipCode'].astype(str)
+df_test['ZipCode'] = df_test['ZipCode'].apply(lambda x: '0' + x if len(x) == 4 else ('00' + x if (len(x) == 3) else x))
+
+from uszipcode import SearchEngine
+def get_state(zip_code):
+    search = SearchEngine()
+    zipcode = search.by_zipcode(str(zip_code))
+    
+    if zipcode and zipcode.state:
+        return zipcode.state
+    else:
+        return None
+
+# Fetch the state and add it to a new column
+df_test['State'] = df_test['ZipCode'].apply(get_state)
+
+# Classify states function
+def classify_state(state):
+    # States east of the Mississippi River
+    east_states = [
+        'ME', 'NH', 'VT', 'MA', 'RI', 'CT', 'NY', 'NJ', 'PA', 'DE', 'MD', 
+        'DC', 'VA', 'WV', 'NC', 'SC', 'GA', 'FL', 'KY', 'TN', 'OH', 'IN',
+        'AL', 'MS'
+    ]
+    # States west of the Mississippi River
+    west_states = [
+        'WA', 'OR', 'CA', 'ID', 'NV', 'AZ', 'UT', 'MT', 'WY', 'CO', 'NM',
+        'AK', 'HI', 'TX', 'OK', 'AR', 'LA', 'ND', 'SD', 'NE', 'KS', 'MN', 
+        'IA', 'MO', 'WI', 'IL'
+    ]
+
+    if state in east_states:
+        return 'East'
+    elif state in west_states:
+        return 'West'
+    else:
+        return 'Other'  # If the input is not a valid U.S. state or is missed
+
+# Create new column
+df_test['Region'] = df_test['State'].apply(classify_state)
+
+df_test.to_csv('test.csv')
+
