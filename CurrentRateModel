@@ -1,1 +1,1370 @@
 # Rate_Automation
+# Rate_Automation
+**This model will rate packages under the actual services shown in PLD**
+
+*********Structure & Input*********
+
+**Structure**:
+
+Section 1. Read in Freight Rates and Re-format 
+
+Section 2. Read in other input tables and Re-format
+
+Section 3. Re-format PLD and rate
+
+Section 4. Analysis
+
+**Input tables**:
+
+Doc. 1. FreightCharge_2023: freight rate cards (insert updated version once a year)
+
+Doc. 2. ClientCharge_2023: client rate and parameters (insert newer version when needed)
+
+Doc. 3. FuelSurcharge_weekly: fuel surcharge rate (update once a week)
+
+Doc. 4. ZipToZone: get zone from destination zip based on different facilities
+
+Doc. 5. ZipToDas_2023: a table to assign the type of DAS Category (insert newer version once a year)
+    
+Doc. 6. PLD: package level detail as an input table
+
+
+**FreightCharge note**
+
+| Carrier | Service | Residential | WeightType | RateType   |
+|:--------|:---------|:-------------|:------------|:------------|
+| UPS     | REDE (UPS NDA Early) / RED (UPS NDA) / REDS (UPS NDA Saver) / 2DAM (UPS 2DA A.M.) / BLUE (UPS 2DA) / ORNG (UPS 3DA) / SRPT (UPS Surepost) | both         | lb         | Published   |
+| UPS     | GRND (UPS Ground Commercial)                                                                                                              | commercial   | lb         | Published   |
+| UPS     | GRES (UPS Ground Residential)                                                                                                             | residential  | lb         | Published   |
+| UPS     | SRPT<1 (UPS Surepost 1#>)                                                                                                                 | both         | oz         | Published   |
+| DHL     | DHLG (DHL SmartMail Parcel Plus Ground 1-25)/DHLE (DHL SmartMail Parcel Plus Expedited 1-25) | both | lb | Company |
+| DHL     | DHLG<1 (DHL SmartMail Parcel Ground < 1lb)/DHLE<1 (DHL SmartMail Parcel Expedited  < 1lb)/DHLEM (DHL SmartMail Parcel Expedited Max) | both | lb | Company |
+| USPS    | USPSAP (USPS Auctane PM) | both | both | Company | 
+| USPS    | USPSFC (USPS First Class) | both | Oz | Company |
+| USPS    | USPSPS (USPS Parcel Select)| both | lb | Company |
+| MI      | MIPLE (MI Parcel Select Lightweight Expedited)|  both | oz | Company |
+| MI      | MIPH (MI Parcel Select Heavyweight)|  both | lb | Company |
+
+
+**Client rate calculation based on Pub rate and Barrett rate**
+
+| Carrier | Service | Client Rate Calculation   |
+|:--------|:---------|:-------------|
+| UPS     | REDE / RED / REDS / 2DAM / BLUE / ORNG |  max(Pub Rate *(1 - Round(Discount,2)), Min) ** |
+| UPS     | GRND / SRPT / GRES  |  max(Pub Rate *(1 - Round(Discount%,2)), Min) **Consider weight break in Lb |
+| UPS     | SRPT<1  |  max(Pub Rate *(1 - Round(Discount%,2)), Min) **Consider weight break in Oz |
+| DHL/USPS/MI | All | Company Cost / (1-Margin%) | 
+
+**Update the code in case you do not want to Round**
+
+
+
+*********Parameter Set Up*********
+
+# Carrier Dim Factor 2023
+import pandas as pd
+import numpy as np
+import math
+from datetime import timedelta, date
+
+#Enter integers
+#Dim factor 2023
+dim_factor_ups_pub = 
+dim_factor_ups = 
+dim_factor_ups_srpt = 
+dim_factor_dhl = 
+dim_factor_usps = 
+dim_factor_mi = 
+
+#Dim Allowance 2023
+ups_allowance = 
+dhl_allowance = 
+usps_allowance = 
+mi_allowance = 
+
+#dhl parameters
+dhl_cubic_inch_threshold_1 = 
+dhl_cubic_inch_threshold_2 = 
+dhl_weight_threshold = 
+dhl_g_and_l_threshold_1 = 
+dhl_g_and_l_threshold_2 = 
+dhl_max_l_threshold_1 = 
+dhl_max_l_threshold_2 = 
+dhl_max_l_threshold_3 = 
+
+dates = ['2023-01-01', '2023-09-30', '2023-10-01', '2023-12-31']
+nqd_dhl_date_1, nqd_dhl_date_2, nqd_dhl_date_3, nqd_dhl_date_4 = [pd.to_datetime(date) for date in dates]
+
+#usps parameters
+usps_l_threshold_1 = 
+usps_l_threshold_2 = 
+usps_cubic_inch_threshold = 
+
+
+**Section 1. Read in Freight Rates and Re-format**
+
+# *************** Read Doc. 1 *************************
+xls = pd.ExcelFile('FreightCharge_2023.xlsx')
+
+# Group the rate cards based on their WeightType & RateType & handle DHL independently
+# Lb and Published Rate
+tabs_1 = ['REDE', 'RED', 'REDS', '2DAM', 'BLUE', 'ORNG', 'GRND', 'GRES', 'SRPT']
+# Lb and Company Rate
+tabs_2 = ['USPSPS', 'USPSAP', 'MIPH']
+# Oz and Published Rate
+tabs_3 = ['SRPT<1'] 
+# Oz and Company Rate
+tabs_4 = ['USPSFC', 'MIPLE']
+# Lb and Company Rate
+dhl_ids_1 = ['5114358', '5122444', '5122723', '5122739', '5122855', '5122890', '5122893', '5123280', '5123282', '5123283']
+dhl_types_1 = ['DHLG', 'DHLE']
+dhl_tabs_1 = [f"{type}_{id}" for id in dhl_ids_1 for type in dhl_types_1]
+# Oz and Company Rate
+dhl_ids_2 = ['5114358', '5122444', '5122723', '5122739', '5122855', '5122890', '5122893', '5123280', '5123282', '5123283']
+dhl_types_2 = ['DHLG<1', 'DHLE<1', 'DHLEM']
+dhl_tabs_2 = [f"{type}_{id}" for id in dhl_ids_2 for type in dhl_types_2 if not (type == 'DHLEM' and id == '5122444')]
+
+# Combine all the groups into a single list
+all_tabs = tabs_1 + tabs_2 + tabs_3 + tabs_4 + dhl_tabs_1 + dhl_tabs_2
+
+# Regroup/re-categorize the tabs into 4 groups
+lb_br_tabs = tabs_2 + dhl_tabs_1    
+lb_pr_tabs = tabs_1
+oz_br_tabs = tabs_4 + dhl_tabs_2    
+oz_pr_tabs = tabs_3
+
+# Load data using a dictionary comprehension. dfs['REDE']
+dfs = {tab: pd.read_excel(xls, tab) for tab in all_tabs}
+
+# Process each dataframe based on tab name
+for tab, df in dfs.items():
+    # Determine weight column name
+    if tab in oz_br_tabs or tab in oz_pr_tabs:
+        weight_col = 'WeightOz'
+    elif tab in lb_br_tabs or tab in lb_pr_tabs:
+        weight_col = 'WeightLb'
+    else:
+        raise ValueError(f"Tab {tab} is not categorized properly by weight.")
+    
+    # Determine rate column name
+    if tab in oz_br_tabs or tab in lb_br_tabs:
+        rate_col_name = 'CompanyRate'
+    elif tab in oz_pr_tabs or tab in lb_pr_tabs:
+        rate_col_name = 'PublishedRate'
+    else:
+        raise ValueError(f"Tab {tab} is not categorized properly by rate.")
+
+    # Apply unstack operation
+    dfs[tab] = (df.set_index('Zones')
+                .unstack()
+                .rename_axis(('Zone', weight_col))
+                .reset_index(name=rate_col_name))
+
+# Concatenate all transformed dataframes into one, with an additional column indicating the tab name
+FreightCharge = pd.concat(dfs.values(), keys=dfs.keys(), ignore_index=False)
+FreightCharge.reset_index(level=0, inplace=True)
+FreightCharge.rename(columns={'level_0': 'ServiceCode'}, inplace=True)
+
+
+# Fill missing values in 'Weight_Lb' using 'Weight_Oz' / 16
+FreightCharge['WeightLb'] = np.where(
+    FreightCharge['WeightLb'].isna(), 
+    FreightCharge['WeightOz'] / 16,     
+    FreightCharge['WeightLb']           
+)
+
+# Fill missing values in 'Weight_Oz' using 'Weight_Lb' * 16
+FreightCharge['WeightOz'] = np.where(
+    FreightCharge['WeightOz'].isna(),  
+    FreightCharge['WeightLb'] * 16,    
+    FreightCharge['WeightOz']          
+)
+
+
+
+# Generate Service detailed names based on ServiceCode section
+subset_numbers = ['5114358', '5122723', '5122739', '5122855', '5122890', '5122893', '5123280', '5123282', '5123283']  # example subset
+
+def generate_service_details(ServiceCode):
+    number = ServiceCode.split('_')[-1]
+    if number not in subset_numbers:
+        return None
+
+    if "DHLG_" in ServiceCode:
+        return f'DHL SmartMail Parcel Plus Ground 1-25 {number}'
+    elif "DHLG<1_" in ServiceCode:
+        return f'DHL SmartMail Parcel Ground < 1lb {number}'
+    elif "DHLE_" in ServiceCode:
+        return f'DHL SmartMail Parcel Plus Expedited 1-25 {number}'
+    elif "DHLE<1_" in ServiceCode:
+        return f'DHL SmartMail Parcel Expedited < 1lb {number}'
+    elif "DHLEM_" in ServiceCode:
+        return f'DHL SmartMail Parcel Expedited Max {number}'
+    else:
+        return None
+
+FreightCharge['Service'] = FreightCharge['ServiceCode'].apply(generate_service_details)
+
+tab_to_description = {
+    'REDE': 'UPS NDA Early',
+    'RED': 'UPS NDA',
+    'REDS': 'UPS NDA Saver',
+    '2DAM': 'UPS 2DA A.M.',
+    'BLUE': 'UPS 2DA',
+    'ORNG': 'UPS 3DA',
+    'GRND': 'UPS Ground Commercial',
+    'GRES': 'UPS Ground Residential',
+    'SRPT<1': 'UPS Surepost 1#>',
+    'SRPT': 'UPS Surepost',
+    'USPSFC': 'USPS First Class',
+    'USPSPS': 'USPS Parcel Select',
+    'USPSAP': 'USPS Priority Mail',
+    'MIPLE': 'MI Parcel Select Lightweight Expedited',
+    'MIPH': 'MI Parcel Select Heavyweight',
+    'DHLG_5122444': 'DHL SmartMail Parcel Plus Ground 1-25 5122444',
+    'DHLG<1_5122444': 'DHL SmartMail Parcel Ground < 1lb 5122444',
+    'DHLE_5122444': 'DHL SmartMail Parcel Plus Expedited 1-25 5122444',
+    'DHLE<1_5122444': 'DHL SmartMail Parcel Expedited < 1lb 5122444',
+    
+}
+
+
+# Function to update the rest of the Services
+def update_service_details(row):
+    # If the Service is empty or None
+    if pd.isnull(row['Service']) or row['Service'] == "":
+        return tab_to_description.get(row['ServiceCode'], row['Service'])
+    else:
+        # Return existing value
+        return row['Service']
+
+FreightCharge['Service'] = FreightCharge.apply(update_service_details, axis=1)
+
+
+# Add the version column. 
+FreightCharge['Version'] ='2023'
+FreightCharge['StartDate'] ='2023/01/01'
+FreightCharge['EndDate'] ='2023/12/31'
+
+
+# Unify the Zone values. 
+def get_portion(value):
+    if isinstance(value, int):
+        return str(value)  # convert integer to string
+    if 'Zone' in value:
+        return value[5:]
+    elif 'US' in value:
+        return value[3:]
+
+FreightCharge['ZONE_new'] = FreightCharge['Zone'].apply(get_portion)
+replacement_mapping = {
+    '20': '', '30': '', '102': '2', '103': '3', '104': '4', '105': '5', '106': '6', '107': '7', '108': '8', 
+    '124': '9', '125': '10', '126': '11', '224': '9', '225': '10', '226': '11', '44': '9', '45': '10', '46': '11',
+    '03': '3', '04': '4', '05': '5', '06': '6', '07': '7', '08': '8', '09': '9'
+}
+
+for key, value in replacement_mapping.items():
+    FreightCharge['ZONE_new'] = FreightCharge['ZONE_new'].str.replace(key, value)
+
+FreightCharge['Zone'] = FreightCharge['ZONE_new']
+FreightCharge = FreightCharge.drop('ZONE_new', axis=1)
+
+
+#adjust the index and finish re-formatting this table.
+FreightCharge.reset_index(drop=True, inplace=True)
+FreightCharge = FreightCharge[['ServiceCode', 'Service', 'Zone', 'WeightOz', 'WeightLb', 'PublishedRate', 'CompanyRate', 'Version', 'StartDate', 'EndDate']]
+FreightCharge['Zone'] = FreightCharge['Zone'].astype('int64')
+FreightCharge['Version'] = FreightCharge['Version'].astype('int64')
+
+#check the table type and content
+#FreightCharge.info() 
+#FreightCharge.head()
+
+#This rate model is currently 2023 Version. Inserting 2024 version requires some update to the raw input tables and below filter.
+FreightCharge = FreightCharge[(FreightCharge['Version'] == 2023)]
+
+**Section 2. Read in all other input tables (and Re-format)**
+
+# ********** Read Doc. 2 **********
+ClientCharge = pd.read_excel('C:\\Users\\sliu\\BD\\re-rate_model\\ClientCharge_2023.xlsx')
+
+# ********** Read Doc. 3 **********
+xls = pd.ExcelFile('FuelSurcharge_weekly.xlsx')
+
+# Re-format the original fsc input doc by adding the range of period based on Ship Date
+def prepare_FSC_data(df, type="UPS"):
+    # Convert Ship Date to datetime once
+    df['Ship Date'] = pd.to_datetime(df['Ship Date'])
+    
+    df['ShipDateStart'] = df['Ship Date']
+    
+    if type == "UPS":
+        df['ShipDateEnd'] = df['ShipDateStart'] + pd.Timedelta(days=6)
+    elif type == "DHL":
+        df['ShipDateEnd'] = df['ShipDateStart'].shift(-1) - timedelta(days=1)
+        df.loc[df['ShipDateStart'] == max(df['ShipDateStart']), ['ShipDateEnd']] = date.today()
+
+    # Drop Ship Date column
+    df.drop('Ship Date', axis=1, inplace=True)
+    
+    return df
+
+
+UPS_FSC = prepare_FSC_data(pd.read_excel(xls, 'UPS_FSC'), type="UPS")
+DHL_FSC = prepare_FSC_data(pd.read_excel(xls, 'DHL_FSC').sort_values(by='Ship Date', ascending=True), type="DHL")
+
+
+# PLD already has a Zone column, but we still need to fill out the empty Zone values in PLD. 
+# ********** Read Doc. 4 **********
+xls = pd.ExcelFile('ZipToZone.xlsx')
+
+# List of sheet names. Using a dictionary comprehension to load sheets into a dictionary of dataframes and then concatenate togeth
+sheets = [
+    '02038_Outbound', '08873_Outbound', '21226_Outbound', '38141_Outbound', '38654_Outbound', 
+    '75041_Outbound', '90640_Outbound', '02324_Outbound', '06096_Outbound', '18105_Outbound', 
+    '21240_Outbound', '43004_Outbound'
+]
+
+dfs = {sheet: pd.read_excel(xls, sheet) for sheet in sheets}
+
+ZipToZone = pd.concat([dfs['02038_Outbound'], dfs['08873_Outbound'], dfs['21226_Outbound'], dfs['38141_Outbound'], dfs['38654_Outbound'], 
+                       dfs['75041_Outbound'], dfs['90640_Outbound'], dfs['02324_Outbound'], dfs['06096_Outbound'], dfs['18105_Outbound'], 
+                       dfs['21240_Outbound'], dfs['43004_Outbound']])
+
+
+# ********** Read Doc. 5 **********
+ZipToDas = pd.read_excel('C:\\Users\\sliu\\BD\\re-rate_model\\ZipToDas_2023.xlsx')
+
+**Section 3. Re-format PLD and rate**
+
+#Load Doc. 6
+PLDfromSnowFlake = pd.read_excel('C:\\xx\\xx\\xx\\xx\\FileName.xlsx')
+#tbl_BP.head()
+#tbl_BP.shape
+
+#Make a copy especially when the original file is too large
+tbl_BP = PLDfromSnowFlake.copy()
+#Clean the empty rows/columns just in case
+tbl_BP = tbl_BP.dropna(axis = 0, how = 'all')
+tbl_BP = tbl_BP.dropna(axis = 1, how = 'all')
+
+tbl_BP.columns
+
+#Separate the correct data from those extremely error data. However, some error data maybe maintained for check.  
+tbl_BP_delete = tbl_BP[(tbl_BP.ShipDate.isnull()) | 
+                       (tbl_BP.ZipCode.isnull()) | 
+                       (tbl_BP.Dimensions.isnull()) | 
+                       (tbl_BP.ActualWeight.isnull()) | 
+                       (tbl_BP.ActualWeight == 0) | 
+                       (tbl_BP.Zone.isnull()) |
+                       (tbl_BP.ResidentialFlag.isnull())]
+
+tbl_BP = tbl_BP[~((tbl_BP.ShipDate.isnull()) | 
+                 (tbl_BP.ZipCode.isnull()) | 
+                 (tbl_BP.Dimensions.isnull()) | 
+                 (tbl_BP.ActualWeight.isnull()) | 
+                 (tbl_BP.ActualWeight == 0) | 
+                 (tbl_BP.Zone.isnull()) |
+                 (tbl_BP.ResidentialFlag.isnull()))]
+
+
+#Required column names and type:     
+# ---  ------             --------------  -----         
+#1   TrackingNumber        ---------------------      int64 (or object)      
+#2   ShipDate              ---------------------      datetime64[ns]
+#3   OLD_SERVICE            ---------------------      object        
+#4   ZIP_CODE               ---------------------      int
+#5   ZONE                   ---------------------      int          
+#6   DIMENSIONS             ---------------------      object     
+#7   ACTUAL_WEIGHT (lb as default)---------------      float64       
+#8   RESIDENTIAL_FLAG       ---------------------      bool   
+tbl_BP.info()
+
+#Drop duplicates based on ID column by only keeping the unique ID associated with the most recent Ship Date.  
+#If there are rows where both tracking no and ship date are duplicated, only keep the first one.
+tbl_BP = tbl_BP.sort_values('ShipDate', ascending=False)
+tbl_BP = tbl_BP.drop_duplicates(subset='TrackingNumber', keep='first')
+tbl_BP = tbl_BP.drop_duplicates(subset='TrackingNumber', keep='first')
+
+#turn dimensions into L W H columns and drop the original dimensions column.
+tbl_BP[['L', 'W', 'H']] = tbl_BP['Dimensions'].str.split('x', expand=True)
+tbl_BP = tbl_BP.drop('Dimensions', axis=1)
+
+#Turn float to integers using the excel way of rounding up. 
+tbl_BP[['L', 'W', 'H']] = tbl_BP[['L', 'W', 'H']].apply(pd.to_numeric)
+tbl_BP['L'] = tbl_BP['L'].apply(lambda x: round(x,0) if x - math.floor(x) < 0.5 else np.ceil(x))
+tbl_BP['W'] = tbl_BP['W'].apply(lambda x: round(x,0) if x - math.floor(x) < 0.5 else np.ceil(x))
+tbl_BP['H'] = tbl_BP['H'].apply(lambda x: round(x,0) if x - math.floor(x) < 0.5 else np.ceil(x))
+
+#add logic to make longest one = L
+# Find the rows where L is not the largest
+rows_to_swap = tbl_BP[tbl_BP['L'] != tbl_BP[['L', 'W', 'H']].max(axis=1)]
+
+# Identify the largest column among L, W, and H
+max_column = tbl_BP[['L', 'W', 'H']].idxmax(axis=1)
+
+# Set the largest number of the 3 columns as L and exchange the values
+for i, row_idx in enumerate(rows_to_swap.index):
+    if max_column[row_idx] == 'W':
+        tbl_BP.loc[row_idx, ['L', 'W']] = tbl_BP.loc[row_idx, ['W', 'L']].values
+    elif max_column[row_idx] == 'H':
+        tbl_BP.loc[row_idx, ['L', 'H']] = tbl_BP.loc[row_idx, ['H', 'L']].values
+
+# Create columns of GirthAndL and CubicInch
+tbl_BP['GirthAndL'] = round(tbl_BP['W'] * 2 + tbl_BP['H'] * 2 + tbl_BP['L'],0)
+tbl_BP['CubicInch'] = round(tbl_BP['W'] * tbl_BP['H'] * tbl_BP['L'],0)
+
+
+# Add 'FromZip' column basd on the value of Facility in the same df.
+tbl_BP['FromZip'] = tbl_BP.apply(
+    lambda row: 
+    '02038' if row['Facility'] in ('FRA', 'MA5', 'BRI', 'MAN') else
+    '08873' if (row['Facility'] in ('JER', 'NJ2')) else
+    '21226' if (row['Facility'] == 'GBM') else
+    '38141' if (row['Facility'] in ('TN2', 'MEM')) else
+    '38654' if (row['Facility'] in ('MS3', 'MS2', 'MST', 'MS5')) else
+    '75041' if (row['Facility'] == 'TX1') else
+    '90640' if (row['Facility'] in ('MBC', 'CA3')) else
+    '', 
+    axis=1
+)
+
+# Fill "Zone" values if this column in the original PLD is insufficient
+def zfill_column(df, col_name):
+    df[col_name] = df[col_name].astype(str).str.zfill(5)
+
+columns_to_fill = [(tbl_BP, 'ZipCode'), (tbl_BP, 'FromZip'), (ZipToZone, 'Origin'), (ZipToZone, 'Dest Zip')]
+#Unify the columns types for merge and fill Zip Code to 5 digits. e.g. 01234 rather than 1234 
+for df, col in columns_to_fill:
+    zfill_column(df, col)
+
+tbl_BP = tbl_BP.merge(ZipToZone[["Origin", "Dest Zip", "GNDZone"]], left_on=['FromZip', 'ZipCode'], right_on=['Origin','Dest Zip'], how='left').rename(columns={'GNDZone': 'ZoneExtra'}).drop(['Origin','Dest Zip'], axis=1)
+tbl_BP['ZoneExtra'] = tbl_BP['ZoneExtra'].astype('str')
+tbl_BP['ZoneExtra'] = (tbl_BP['ZoneExtra'].str.replace('44', '9')
+                              .str.replace('45', '10')
+                              .str.replace('46', '11'))
+
+tbl_BP['Zone'] = tbl_BP['Zone'].fillna(tbl_BP['ZoneExtra'])
+tbl_BP = tbl_BP.drop('ZoneExtra', axis=1)
+
+# Add ServiceCode column to PLD
+# Do not change the order of this code without knowing the logic here. 
+
+shipping_map = {
+    "UPS Next Day Air Early": "REDE",
+    "UPS Next Day Air Saver": "REDS",
+    "UPS Next Day Air": "RED",
+    "UPS 2nd Day Air A.M.": "2DAM",
+    "UPS 2nd Day Air": "BLUE",
+    "UPS 3 Day Select": "ORNG",
+    "UPS Ground": "GRND",
+    "UPS SurePost 1 lb or Greater": "SRPT",
+    "UPS SurePost Less than 1 lb": "SRPT<1",
+    "DHL SmartMail Parcel Expedited Max": "DHLEM",
+    "DHL SmartMail Parcel Plus Expedited": "DHLE",
+    "DHL SmartMail Parcel Expedited": "DHLE<1",
+    "DHL SmartMail Parcel Plus Ground": "DHLG",
+    "DHL SmartMail Parcel Ground": "DHLG<1",
+    "USPS 1st Class (Endicia)": "USPSFC",
+    "USPS First Class Mail": "USPSFC",
+    "USPS Parcel Select (Endicia)": "USPSPS",
+    "USPS Express (Endicia)": "USPSAP",
+    "USPS Priority (Endicia)": "USPSAP",
+    "USPS Priority Mail": "USPSAP",
+    "UPS Mail Innovations First Class": "MIPH",
+    "UPS Mail Innovations Expedited": "MIPLE",
+}
+
+def label_shipping(row):
+    for key, value in shipping_map.items():
+        if key in row:
+            return value
+    return "OTHER"
+
+tbl_BP['ServiceCode'] = tbl_BP['Service'].apply(label_shipping)
+tbl_BP['ServiceCode'] = tbl_BP.apply(lambda row: 'GRES' if (row['ResidentialFlag'] == True and row['ServiceCode'] == 'GRND') else row['ServiceCode'], axis=1)
+
+
+# Add PublishedBilledWeightLb and PublishedBilledWeightOz columns for UPS
+def compute_weights(row):
+    if row['ServiceCode'] in ['REDE','RED','REDS','2DAM','BLUE','ORNG','GRND','GRES','SRPT']:
+        return max(np.ceil(row['ActualWeight']), np.ceil(row['CubicInch']/dim_factor_ups_pub)), None
+    elif row['ServiceCode'] == 'SRPT<1':
+        return None, max(np.ceil(row['ActualWeight']), np.ceil(row['CubicInch']/dim_factor_ups_pub))*16
+    else:
+        return None, None
+
+tbl_BP['PublishedBilledWeightLb'], tbl_BP['PublishedBilledWeightOz'] = zip(*tbl_BP.apply(compute_weights, axis=1))
+
+
+# add CustomerBilledWeightLb and CustomerBilledWeightOz columns for all PLD
+def cust_billed_weight_lb_condition_1(row):    
+    if row['ServiceCode'] in ['REDE','RED','REDS','2DAM','BLUE','ORNG','GRND','GRES']:
+        return max(np.ceil(row['ActualWeight']), np.ceil(row['CubicInch']/dim_factor_ups))
+    if row['ServiceCode'] == 'SRPT' and row['CubicInch'] >= ups_allowance:
+        return max(np.ceil(row['ActualWeight']), np.ceil(row['CubicInch']/dim_factor_ups_srpt))
+    if row['ServiceCode'] == 'SRPT' and row['CubicInch'] < ups_allowance:
+        return np.ceil(row['ActualWeight'])
+    if row['ServiceCode'] in ('DHLG', 'DHLE') and (row['CubicInch'] >= dhl_allowance and row['ActualWeight'] >= 1):
+        return max(np.ceil(row['ActualWeight']), np.ceil(row['CubicInch']/dim_factor_dhl))
+    if row['ServiceCode'] in ('DHLG', 'DHLE') and (row['CubicInch'] < dhl_allowance or row['ActualWeight'] < 1):
+        return np.ceil(row['ActualWeight'])        
+    if row['ServiceCode'] == 'MIPH' and (row['CubicInch'] > mi_allowance and row['ActualWeight'] >= 1):
+        return max(row['ActualWeight'], np.ceil(row['CubicInch']/dim_factor_mi))
+    if row['ServiceCode'] == 'MIPH' and (row['CubicInch'] <= mi_allowance or row['ActualWeight'] < 1):
+        return np.ceil(row['ActualWeight'])  
+    if row['ServiceCode'] in ('USPSPS') and row['CubicInch'] > usps_allowance:
+        return max(np.ceil(row['ActualWeight']), np.ceil(row['CubicInch']/dim_factor_usps))
+    if row['ServiceCode'] in ('USPSPS') and row['CubicInch'] <= usps_allowance:
+        return np.ceil(row['ActualWeight'])
+    if row['ServiceCode'] == 'DHLEM' and (row['CubicInch'] >= dhl_allowance and row['ActualWeight'] >= 1):
+        return max(np.ceil(row['ActualWeight']), np.ceil(row['CubicInch']/dim_factor_dhl))
+    if row['ServiceCode'] == 'DHLEM' and (row['CubicInch'] < dhl_allowance and row['ActualWeight'] >= 1):
+        return np.ceil(row['ActualWeight'])
+    if row['ServiceCode'] == 'USPSAP' and (row['CubicInch'] > usps_allowance and row['ActualWeight'] >= 1):
+        return max(np.ceil(row['ActualWeight']), np.ceil(row['CubicInch']/dim_factor_usps))
+    if row['ServiceCode'] == 'USPSAP' and (row['CubicInch'] <= usps_allowance and row['ActualWeight'] >= 1):
+        return np.ceil(row['ActualWeight'])
+    if row['ServiceCode'] == 'USPSAP' and (row['CubicInch'] > usps_allowance and row['ActualWeight'] < 1 and max(np.ceil(row['ActualWeight']), np.ceil(row['CubicInch']/dim_factor_usps)) > 1):
+        return max(np.ceil(row['ActualWeight']), np.ceil(row['CubicInch']/dim_factor_usps))
+    
+def cust_billed_weight_oz_condition_2(row):
+    if row['ServiceCode'] == 'SRPT<1' and row['CubicInch'] >= ups_allowance:
+        return max(np.ceil(row['ActualWeight']), np.ceil(row['CubicInch']/dim_factor_ups))*16
+    if row['ServiceCode'] == 'SRPT<1' and row['CubicInch'] < ups_allowance:
+        return np.ceil(row['ActualWeight']*16)
+    if row['ServiceCode'] in ('DHLG<1', 'DHLE<1') and (row['CubicInch'] >= dhl_allowance and row['ActualWeight'] >= 1):
+        return max(np.ceil(row['ActualWeight']), np.ceil(row['CubicInch']/dim_factor_dhl))
+    if row['ServiceCode'] in ('DHLG<1', 'DHLE<1') and (row['CubicInch'] < dhl_allowance or row['ActualWeight'] < 1):
+        return np.ceil(row['ActualWeight']*16) 
+    if row['ServiceCode'] == 'MIPLE' and (row['CubicInch'] > mi_allowance and row['ActualWeight'] >= 1):
+        return max(row['ActualWeight'], np.ceil(row['CubicInch']/dim_factor_mi))                                           
+    if row['ServiceCode'] == 'MIPLE' and (row['CubicInch'] <= mi_allowance or row['ActualWeight'] < 1):
+        return np.ceil(row['ActualWeight']*16)
+    if row['ServiceCode'] in ('USPSFC') and (row['CubicInch'] > usps_allowance and row['ActualWeight'] <= 1):
+        return max(np.ceil(row['ActualWeight']), np.ceil(row['CubicInch']/dim_factor_usps))*16
+    if row['ServiceCode'] in ('USPSFC') and (row['CubicInch'] <= usps_allowance and row['ActualWeight'] <= 1):
+        return np.ceil(row['ActualWeight']*16)
+    if row['ServiceCode'] == 'DHLEM' and (row['CubicInch'] >= dhl_allowance and row['ActualWeight'] < 1):
+        return np.ceil(row['ActualWeight']*16)
+    if row['ServiceCode'] == 'DHLEM' and (row['CubicInch'] < dhl_allowance and row['ActualWeight'] < 1):
+        return np.ceil(row['ActualWeight']*16)
+    if row['ServiceCode'] == 'USPSAP' and (row['CubicInch'] > usps_allowance and row['ActualWeight'] < 1 and max(np.ceil(row['ActualWeight']), np.ceil(row['CubicInch']/dim_factor_usps))*16 <= 8):
+        return 8
+    if row['ServiceCode'] == 'USPSAP' and (row['CubicInch'] > usps_allowance and row['ActualWeight'] < 1 and max(np.ceil(row['ActualWeight']), np.ceil(row['CubicInch']/dim_factor_usps))*16 > 8 and max(np.ceil(row['ActualWeight']), np.ceil(row['CubicInch']/dim_factor_usps))*16 <= 16):
+        return 16
+    if row['ServiceCode'] == 'USPSAP' and (row['CubicInch'] <= usps_allowance and row['ActualWeight'] < 1 and np.ceil(row['ActualWeight']*16) <= 8):
+        return 8
+    if row['ServiceCode'] == 'USPSAP' and (row['CubicInch'] <= usps_allowance and row['ActualWeight'] < 1 and np.ceil(row['ActualWeight']*16) > 8 and np.ceil(row['ActualWeight']*16) <= 16):
+        return 16
+
+
+tbl_BP['CustomerBilledWeightLb'] = pd.np.nan
+tbl_BP['CustomerBilledWeightOz'] = pd.np.nan
+
+
+condition_1 = (tbl_BP['ServiceCode'].isin(['REDE', 'RED', 'REDS', '2DAM', 'BLUE', 'ORNG', 'GRND', 'GRES', 'SRPT', 'DHLG', 'DHLE', 'MIPH', 'USPSPS'])) | (tbl_BP['ServiceCode'].isin(['DHLEM', 'USPSAP']) & tbl_BP['ActualWeight'] >= 1)
+tbl_BP.loc[condition_1, 'CustomerBilledWeightLb'] = tbl_BP[condition_1].apply(cust_billed_weight_lb_condition_1, axis=1)
+
+condition_2 = (tbl_BP['ServiceCode'].isin(['SRPT<1', 'DHLG<1', 'DHLE<1', 'MIPLE', 'USPSFC']) & tbl_BP['ActualWeight'] < 1) | (tbl_BP['ServiceCode'].isin(['DHLEM', 'USPSAP']) & tbl_BP['ActualWeight'] < 1)
+tbl_BP.loc[condition_2, 'CustomerBilledWeightOz'] = tbl_BP[condition_2].apply(cust_billed_weight_oz_condition_2, axis=1)
+
+
+
+**Add Freight Rates (Published & Barrett Rate) to PLD**
+
+# Add Freight Rates to PLD. 
+
+# Except DHL
+# Published Rates & Lb
+group_1 = ['REDE', 'RED', 'REDS', '2DAM', 'BLUE', 'ORNG', 'GRND', 'GRES', 'SRPT'] 
+# Published Rates & Oz
+group_2 = ['SRPT<1']  
+# Barrett Rates & Lb
+group_3 = ['USPSPS', 'USPSAP', 'MIPH']  
+# Barrett Rates & Oz
+group_4 = ['USPSFC', 'USPSAP', 'MIPLE']  
+
+# 1. Merge for Published Rates & Lb
+tbl_BP = tbl_BP.merge(
+    FreightCharge[FreightCharge['PublishedRate'].notna() & FreightCharge['ServiceCode'].isin(group_1)][['ServiceCode', 'WeightLb', 'Zone', 'PublishedRate']],
+    left_on=['ServiceCode', 'CustomerBilledWeightLb', 'Zone'],
+    right_on=['ServiceCode', 'WeightLb', 'Zone'],
+    how='left'
+).rename(columns={'PublishedRate': 'PublishedRate_Lb'}).drop(columns='WeightLb')
+
+# 2. Merge for Published Rates & Oz
+tbl_BP = tbl_BP.merge(
+    FreightCharge[FreightCharge['PublishedRate'].notna() & FreightCharge['ServiceCode'].isin(group_2)][['ServiceCode', 'WeightOz', 'Zone', 'PublishedRate']],
+    left_on=['ServiceCode', 'CustomerBilledWeightOz', 'Zone'],
+    right_on=['ServiceCode', 'WeightOz', 'Zone'],
+    how='left'
+).rename(columns={'PublishedRate': 'PublishedRate_Oz'}).drop(columns='WeightOz')
+
+# 3. Merge for Company Rates & Lb
+tbl_BP = tbl_BP.merge(
+    FreightCharge[FreightCharge['CompanyRate'].notna() & FreightCharge['ServiceCode'].isin(group_3)][['ServiceCode', 'WeightLb', 'Zone', 'CompanyRate']],
+    left_on=['ServiceCode', 'CustomerBilledWeightLb', 'Zone'],
+    right_on=['ServiceCode', 'WeightLb', 'Zone'],
+    how='left'
+).rename(columns={'BarrettRate': 'BarrettRate_Lb'}).drop(columns='WeightLb')
+
+# Set the 'CompanyRate_Lb' values to NaN for rows that meet this condition as we want to use oversize rate rather than this rate
+mask_1 = (tbl_BP['GirthAndL'] > 108) & (tbl_BP['GirthAndL'] <= 130)
+mask_2 = tbl_BP['GirthAndL'] > 130
+tbl_BP.loc[mask_1, 'CompanyRate_Lb'] = np.nan
+tbl_BP.loc[mask_2, 'CompanyRate_Lb'] = np.nan
+
+#uspsps. for parcels that measure in combined length and girth more than 108 inches but not more than 130 inches, use oversized prices, 
+#regardless of weight, based on the applicable zone. Oversized price is deleted as we will never use them. 
+
+# Use the mask to merge only those rows directly in tbl_BP
+merged_subset = tbl_BP[mask_1].merge(
+    FreightCharge[(FreightCharge['ServiceCode'] == 'USPSPS') & (FreightCharge['WeightLb'] == 9999)][['ServiceCode', 'Zone', 'BarrettRate']],
+    left_on=['ServiceCode', 'Zone'],
+    right_on=['ServiceCode', 'Zone'],
+    how='left'
+)
+
+# Now, assign the 'BarrettRate' values from the merged subset back to 'BarrettRate_Lb' in the original tbl_BP where the mask is True
+tbl_BP.loc[mask_1, 'BarrettRate_Lb'] = merged_subset['BarrettRate']
+
+
+# 4. Merge for Barrett Rates & Oz
+tbl_BP = tbl_BP.merge(
+    FreightCharge[FreightCharge['BarrettRate'].notna() & FreightCharge['ServiceCode'].isin(group_4)][['ServiceCode', 'WeightOz', 'Zone', 'BarrettRate']],
+    left_on=['ServiceCode', 'CustomerBilledWeightOz', 'Zone'],
+    right_on=['ServiceCode', 'WeightOz', 'Zone'],
+    how='left'
+).rename(columns={'BarrettRate': 'BarrettRate_Oz'}).drop(columns='WeightOz')
+
+
+# Combine all the Rate columns into one 'Rate' column. This column is a combination of Published Rate and Barrett Rate. 
+tbl_BP['Rate'] = tbl_BP['PublishedRate_Lb'].combine_first(tbl_BP['PublishedRate_Oz']).combine_first(tbl_BP['BarrettRate_Lb']).combine_first(tbl_BP['BarrettRate_Oz'])
+
+# Drop the intermediate Rate columns
+columns_to_drop = ['PublishedRate_Lb', 'PublishedRate_Oz', 'BarrettRate_Lb', 'BarrettRate_Oz']
+tbl_BP.drop(columns=columns_to_drop, inplace=True)
+
+# DHL section. This is separate because DHL needs additional merge to Facility. 
+#Barrett Rate and Lb
+group_5 = ['DHLG', 'DHLE', 'DHLEM'] 
+#Barrett Rate and Oz
+group_6 = ['DHLG<1', 'DHLE<1', 'DHLEM']  
+
+# Define the mask to select rows where ServiceCode starts with 'DHL'
+mask = FreightCharge['ServiceCode'].str.startswith('DHL')
+
+FreightCharge[['ServiceCode_DHL', 'Facility_DHL']] = FreightCharge.loc[mask, 'ServiceCode'].str.extract(r'(DHLG<1|DHLE<1|DHLG|DHLE|DHLEM)_([0-9]{7})')
+
+key_mapping = {
+    'FRA': '5114358', 'MA5': '5114358', 'JER': '5122444', 'NJ2': '5122444', 'TX1': '5122855', 'GBM': '5123283', 'MEM': '5122893', 
+    'TN2': '5122893', 'MS2': '5122723', 'MS3': '5122723', 'MS5': '5122723', 'MST': '5122723', 'BRI': '5123282', 'MAN': '5123280' 
+}
+
+tbl_BP['key_mapped'] = tbl_BP['Facility'].map(key_mapping)
+
+tbl_BP = tbl_BP.merge(
+    FreightCharge[FreightCharge['ServiceCode_DHL'].notna() & FreightCharge['ServiceCode_DHL'].isin(group_5)][['ServiceCode_DHL', 'Facility_DHL', 'WeightLb', 'Zone', 'BarrettRate']],
+    left_on=['ServiceCode', 'key_mapped', 'CustomerBilledWeightLb', 'Zone'],
+    right_on=['ServiceCode_DHL', 'Facility_DHL', 'WeightLb', 'Zone'],
+    how='left'
+).rename(columns={'BarrettRate': 'BarrettRate_Lb'}).drop(columns=['ServiceCode_DHL', 'Facility_DHL', 'WeightLb'])
+
+tbl_BP = tbl_BP.merge(
+    FreightCharge[FreightCharge['ServiceCode_DHL'].notna() & FreightCharge['ServiceCode_DHL'].isin(group_6)][['ServiceCode_DHL', 'Facility_DHL', 'WeightOz', 'Zone', 'BarrettRate']],
+    left_on=['ServiceCode', 'key_mapped', 'CustomerBilledWeightOz', 'Zone'],
+    right_on=['ServiceCode_DHL', 'Facility_DHL', 'WeightOz', 'Zone'],
+    how='left'
+).rename(columns={'BarrettRate': 'BarrettRate_Oz'}).drop(columns=['ServiceCode_DHL', 'Facility_DHL', 'WeightOz', 'key_mapped'])
+
+# Combine all the Rate columns into one 'Rate' column
+tbl_BP['Rate'] = tbl_BP['Rate'].combine_first(tbl_BP['BarrettRate_Lb']).combine_first(tbl_BP['BarrettRate_Oz'])
+
+# Drop the intermediate Rate columns
+columns_to_drop = ['BarrettRate_Lb', 'BarrettRate_Oz']
+tbl_BP.drop(columns=columns_to_drop, inplace=True)
+
+
+**Add Client Freight Rate to PLD**
+
+# Specify the ServiceCodes for the 4 different ways of calculating client rates. See the table above.  
+clientRate_calculation_1 = ["REDE", "RED", "REDS", "2DAM", "BLUE", "ORNG"]  
+clientRate_calculation_2 = ["GRND", "GRES", "SRPT"]
+clientRate_calculation_3 = ["SRPT<1"]
+clientRate_calculation_4 = ["DHLG", "DHLG<1", "DHLE", "DHLE<1", "DHLEM", "USPSPS", 'USPSFC', 'USPSAP']
+
+# Use a regular expression pattern to extract the minimum and maximum weights directly into 'min_weight' and 'max_weight' for merge
+pattern = r'(\d+)(?:-(\d+))?(?:lb|oz)?\+?'
+ClientCharge[['min_weight', 'max_weight']] = ClientCharge['ServiceNote'].str.extract(pattern)
+
+# Handle specific patterns and adjust min_weight and max_weight accordingly
+mask_31plus = ClientCharge['ServiceNote'] == '31+lb'
+ClientCharge.loc[mask_31plus, 'max_weight'] = '999'
+
+mask_9lb = ClientCharge['ServiceNote'] == '9lb'
+ClientCharge.loc[mask_9lb, 'max_weight'] = '9'
+
+# Convert min_weight and max_weight to integers, keeping NaN values intact
+ClientCharge['min_weight'] = ClientCharge['min_weight'].astype(float).astype('Int64')
+ClientCharge['max_weight'] = ClientCharge['max_weight'].astype(float).astype('Int64')
+
+
+# Merge `PLD` with `ClientCharge`. Note that there will be duplications for clientRate_calculation_2 groups. merge and np is faster than if statement and apply lambda.  
+merged_df = tbl_BP.merge(ClientCharge, 
+                         left_on=['CustomerID', 'ServiceCode'], 
+                         right_on=['CompanyID', 'ServiceCode'], 
+                         how='left')
+
+# Calculate client rate for clientRate_calculation_1
+mask1 = merged_df['ServiceCode'].isin(clientRate_calculation_1)
+merged_df.loc[mask1, 'result'] = round(np.maximum(merged_df.loc[mask1, 'Rate'] * (1 - merged_df.loc[mask1, 'Price'].round(2)),
+                                            merged_df.loc[mask1, 'PriceMin']),2)
+
+
+# Calculate client rate for clientRate_calculation_2
+mask2 = (
+    merged_df['ServiceCode'].isin(clientRate_calculation_2) &
+    (merged_df['min_weight'] <= merged_df['CustomerBilledWeightLb']) &
+    (merged_df['max_weight'] >= merged_df['CustomerBilledWeightLb'])
+)
+merged_df.loc[mask2, 'result'] = round(np.maximum(merged_df.loc[mask2, 'Rate'] * (1 - merged_df.loc[mask2, 'Price'].round(2)),
+                                            merged_df.loc[mask2, 'PriceMin']),2)
+
+# Delete the duplications occurred in merge above only for clientRate_calculation_2
+mask_drop = (
+    merged_df['ServiceCode'].isin(clientRate_calculation_2) & 
+    merged_df['result'].isna()
+)
+
+merged_df = merged_df[~mask_drop]
+
+# Calculate client rate for clientRate_calculation_3
+mask3 = (
+    merged_df['ServiceCode'].isin(clientRate_calculation_3) &
+    (merged_df['min_weight'] <= merged_df['CustomerBilledWeightOz']) &
+    (merged_df['max_weight'] >= merged_df['CustomerBilledWeightOz'])
+)
+merged_df.loc[mask3, 'result'] = round(np.maximum(merged_df.loc[mask3, 'Rate'] * (1 - merged_df.loc[mask3, 'Price'].round(2)),
+                                            merged_df.loc[mask3, 'PriceMin']),2)
+
+
+# Calculate client rate for clientRate_calculation_4
+mask4 = merged_df['ServiceCode'].isin(clientRate_calculation_4)
+merged_df.loc[mask4, 'result'] = round(merged_df.loc[mask4, 'Rate'] / (1 - merged_df.loc[mask4, 'Price']),2)
+
+
+# attached the CustomerFreight back to the original PLD
+tbl_BP = tbl_BP.merge(
+    merged_df[['TrackingNumber', 'result']],
+    left_on=['TrackingNumber'],
+    right_on=['TrackingNumber'],
+    how='left'
+).rename(columns={'result': 'CustomerFreight', 'Rate': 'PublishedFreight'})
+
+
+# Filter rows where 'exclude_rates' column value is in the provided list
+condition = ~tbl_BP['ServiceCode'].isin(["REDE", "RED", "REDS", "2DAM", "BLUE", "ORNG", "GRND", "GRES", "SRPT", "SRPT<1"])
+
+# If the condition is met, then set 'PublishedFreight' to NaN because they are actually Barrett Rate here if not UPS 
+tbl_BP.loc[condition, 'PublishedFreight'] = np.nan
+
+
+# HandleJohnnie-o flat rate special case
+tbl_BP.loc[
+    (tbl_BP['CustomerID'] == 9019) &
+    (tbl_BP['ServiceCode'].isin(['RED', 'REDS'])) &
+    (tbl_BP['CustomerBilledWeightLb'] <= 5) &
+    (tbl_BP['Zone'] <= 8),
+    'CustomerFreight'
+] = 27
+
+
+tbl_BP.loc[
+    (tbl_BP['CustomerID'] == 9019) &
+    (tbl_BP['ServiceCode'].isin(['2DAM','BLUE'])) &
+    (tbl_BP['CustomerBilledWeightLb'] <= 5) &
+    (tbl_BP['Zone'] <= 8),
+    'CustomerFreight'
+] = 17
+
+
+**Add UPS Published & Client Resi, Das, and Ahs fee**
+
+# Add Resi Code
+tbl_BP['ResCode'] = tbl_BP.apply(lambda row:
+                                        'RESA' if (row['ServiceCode'] in ('REDE', 'RED', 'REDS', '2DAM', 'BLUE', 'ORNG') and (row['ResidentialFlag'] == True)) else
+                                        ('RESG' if (row['ServiceCode'] == 'GRES' and row['ResidentialFlag'] == True) else ('')), axis=1)
+
+
+# Add Das Code
+
+ZipToDas['Zip'] = ZipToDas['Zip'].astype(str).apply(lambda x: '0' + x if len(x) == 4 else ('00' + x if len(x) == 3 else x))
+
+tbl_BP = tbl_BP.merge(ZipToDas[["Zip", "Type"]], left_on='ZipCode', right_on='Zip', how='left').rename(columns={'Type': 'DASCategory'})
+
+tbl_BP.drop(columns=['Zip'], inplace=True)
+
+tbl_BP.loc[~tbl_BP['ServiceCode'].isin(['REDE', 'RED', 'REDS', '2DAM', 'BLUE', 'ORNG', 'GRND', 'GRES', 'SRPT', 'SRPT<1']), 'DASCategory'] = None
+
+
+tbl_BP['DasCode'] = tbl_BP.apply(
+    lambda row: 
+    ('DASCG' if (row['ServiceCode'] == 'GRND' and row['ResidentialFlag'] == False and row['DASCategory'] == 'DAS') else
+    ('DASECG' if (row['ServiceCode'] == 'GRND' and row['ResidentialFlag'] == False and row['DASCategory'] == 'DASE') else
+    ('DASRG' if (row['ServiceCode'] == 'GRES' and row['ResidentialFlag'] == True and row['DASCategory'] == 'DAS') else
+    ('DASERG' if (row['ServiceCode'] == 'GRES' and row['ResidentialFlag'] == True and row['DASCategory'] == 'DASE') else
+    ('DASCA' if (row['ServiceCode'] in ('REDE', 'RED', 'REDS', '2DAM', 'BLUE', 'ORNG') and row['ResidentialFlag'] == False and row['DASCategory'] == 'DAS') else
+    ('DASECA' if (row['ServiceCode'] in ('REDE', 'RED', 'REDS', '2DAM', 'BLUE', 'ORNG') and row['ResidentialFlag'] == False and row['DASCategory'] == 'DASE') else
+    ('DASRA' if (row['ServiceCode'] in ('REDE', 'RED', 'REDS', '2DAM', 'BLUE', 'ORNG') and row['ResidentialFlag'] == True and row['DASCategory'] == 'DAS') else
+    ('DASERA' if (row['ServiceCode'] in ('REDE', 'RED', 'REDS', '2DAM', 'BLUE', 'ORNG') and row['ResidentialFlag'] == True and row['DASCategory'] == 'DASE') else
+    ('DASSP' if (row['ServiceCode'] in ('SRPT', 'SRPT<1') and row['DASCategory'] == 'DAS') else
+    ('DASESP' if (row['ServiceCode'] in ('SRPT', 'SRPT<1') and row['DASCategory'] == 'DASE') else
+    ('REM' if (row['DASCategory'] == 'RA') else
+    ('REMAK' if (row['DASCategory'] == 'AK') else
+    ('REMHI' if (row['DASCategory'] == 'HI') else
+    ''))))))))))))),  # This is your catch-all condition
+    axis=1)
+
+
+# Add 4 AhsCodes separately 
+target_servicecode = ['REDE', 'RED', 'REDS', '2DAM', 'BLUE', 'ORNG', 'GRND', 'GRES', 'SRPT', 'SRPT<1']
+
+# Define a function to generate AhsCode values based on conditions
+def generate_ahs_code(row, column_name):
+    if row['ServiceCode'] not in target_servicecode:
+        return None
+
+    if column_name == 'Ahs1Code':
+        if row['GirthAndL'] > 105:
+            if row['Zone'] == 2:
+                return 'AHG2'
+            elif 2 < row['Zone'] < 5:
+                return 'AHG34'
+            elif row['Zone'] > 4:
+                return 'AHG5'
+    
+    elif column_name == 'Ahs2Code':
+        if row['L'] > 48:
+            if row['Zone'] == 2:
+                return 'AHL2'
+            elif 2 < row['Zone'] < 5:
+                return 'AHL34'
+            elif row['Zone'] > 4:
+                return 'AHL5'
+
+    elif column_name == 'Ahs3Code':
+        if row['W'] > 30:
+            if row['Zone'] == 2:
+                return 'AHW2'
+            elif 2 < row['Zone'] < 5:
+                return 'AHW34'
+            elif row['Zone'] > 4:
+                return 'AHW5'
+
+    elif column_name == 'Ahs4Code':
+        if row['ActualWeight'] > 50:
+            if row['Zone'] == 2:
+                return 'AHLB2'
+            elif 2 < row['Zone'] < 5:
+                return 'AHLB34'
+            elif row['Zone'] > 4:
+                return 'AHLB5'
+
+    return None
+
+# Generate AhsCode columns
+for i in range(1, 5):
+    column_name = f'Ahs{i}Code'
+    tbl_BP[column_name] = tbl_BP.apply(lambda row: generate_ahs_code(row, column_name), axis=1)
+
+ 
+
+ 
+# Get Published Rates. 
+# Need to temporarily change the column name to prevent duplicated columns from confusing the merge function
+tbl_BP = tbl_BP.rename(columns={'ServiceCode': 'TempServiceCode'})
+
+    
+# Define service code lists
+service_codes = {
+    'Res': ['RESA', 'RESG'],
+    'Das': ['DASCG', 'DASECG', 'DASRG', 'DASERG', 'DASCA', 'DASECA', 'DASRA', 'DASERA', 'DASSP', 'DASESP', 'REM', 'REMAK', 'REMHI'],
+    'Ahs1': ['AHG2', 'AHG34', 'AHG5'],
+    'Ahs2': ['AHL2', 'AHL34', 'AHL5'],
+    'Ahs3': ['AHW2', 'AHW34', 'AHW5'],
+    'Ahs4': ['AHLB2', 'AHLB34', 'AHLB5']
+}
+
+company = 'UPS'
+
+# Merge service codes into tbl_BP
+for code_type, service_list in service_codes.items():
+    column_name = f'Published{code_type}'
+    tbl_BP = tbl_BP.merge(
+        ClientCharge[(ClientCharge['Company'] == company) & (ClientCharge['ServiceCode'].isin(service_list))][['ServiceCode', 'Price']],
+        left_on=[f'{code_type.capitalize()}Code'],
+        right_on=['ServiceCode'],
+        how='left'
+    ).rename(columns={'Price': column_name}).drop(columns=['ServiceCode'])
+
+
+
+
+# Get Client discounts
+for code_type, service_list in service_codes.items():
+    code_column_name = f'{code_type}Code'
+    tbl_BP = tbl_BP.merge(
+        ClientCharge[(ClientCharge['ServiceCode'].isin(service_list))][['CompanyID', 'ServiceCode', 'Price']],
+        left_on=['CustomerID', code_column_name],
+        right_on=['CompanyID', 'ServiceCode'],
+        how='left'
+    ).rename(columns={'Price': f'Discount{code_type}'}).drop(columns=['CompanyID', 'ServiceCode'])
+
+        
+        
+# Get Client Rates
+cols_to_fill = ['PublishedRes', 'PublishedDas', 'PublishedAhs1', 'PublishedAhs2', 'PublishedAhs3', 'PublishedAhs4',
+                'DiscountRes', 'DiscountDas', 'DiscountAhs1', 'DiscountAhs2', 'DiscountAhs3', 'DiscountAhs4']
+
+# Fill NaN in the specified columns with 0 for easier calculation later
+tbl_BP[cols_to_fill] = tbl_BP[cols_to_fill].fillna(0)
+
+
+# Calculate for Customer Resi, Das, and Ahs rates
+tbl_BP['CustomerRes'] = round(tbl_BP['PublishedRes']*(1-tbl_BP['DiscountRes']),2)
+tbl_BP['CustomerDas'] = round(tbl_BP['PublishedDas']*(1-tbl_BP['DiscountDas']),2)
+tbl_BP['CustomerAhs1'] = round(tbl_BP['PublishedAhs1']*(1-tbl_BP['DiscountAhs1']),2)
+tbl_BP['CustomerAhs2'] = round(tbl_BP['PublishedAhs2']*(1-tbl_BP['DiscountAhs2']),2)
+tbl_BP['CustomerAhs3'] = round(tbl_BP['PublishedAhs3']*(1-tbl_BP['DiscountAhs3']),2)
+tbl_BP['CustomerAhs4'] = round(tbl_BP['PublishedAhs4']*(1-tbl_BP['DiscountAhs4']),2)
+
+tbl_BP['PublishedAhs'] = tbl_BP['PublishedAhs1'] + tbl_BP['PublishedAhs2'] + tbl_BP['PublishedAhs3'] + tbl_BP['PublishedAhs4']
+tbl_BP['CustomerAhs'] = tbl_BP['CustomerAhs1'] + tbl_BP['CustomerAhs2'] + tbl_BP['CustomerAhs3'] + tbl_BP['CustomerAhs4']
+
+
+# Columns you want to fill
+cols_to_fill = ['CustomerRes', 'CustomerDas']
+
+# Fill NaN in the specified columns with 0 for easier calculation later
+tbl_BP[cols_to_fill] = tbl_BP[cols_to_fill].fillna(0)
+
+
+
+# Drop the intermediate Rate columns
+columns_to_drop = ['ResCode', 'DasCode', 'Ahs1Code', 'Ahs2Code', 'Ahs3Code', 'Ahs4Code', 'DiscountRes', 'DiscountDas', 
+                   'PublishedAhs1', 'PublishedAhs2', 'PublishedAhs3', 'PublishedAhs4', 'DiscountAhs1', 'DiscountAhs2', 
+                   'DiscountAhs3', 'DiscountAhs4', 'CustomerAhs1', 'CustomerAhs2', 'CustomerAhs3', 'CustomerAhs4']
+
+tbl_BP.drop(columns=columns_to_drop, inplace=True)
+
+
+# Name the column back to its original name
+tbl_BP = tbl_BP.rename(columns={'TempServiceCode': 'ServiceCode'})
+
+
+
+
+**Add dhl accessorials**
+
+#dhl_cubic_inch_threshold_1 = 1728/ dhl_cubic_inch_threshold_2 = 3456/ dhl_weight_threshold = 1 /dhl_g_and_l_threshold_1 = 50
+#dhl_g_and_l_threshold_2 = 84/ dhl_max_l_threshold_1 = 22/ dhl_max_l_threshold_2 = 27/ dhl_max_l_threshold_3 = 30
+#dates = ['2023-01-01', '2023-09-30', '2023-10-01', '2023-12-31']
+#nqd_dhl_date_1, nqd_dhl_date_2, nqd_dhl_date_3, nqd_dhl_date_4 = [pd.to_datetime(date) for date in dates]
+
+# Mask for specific ServiceCode values
+service_codes = ["DHLG", "DHLG<1", "DHLE", "DHLE<1", "DHLEM"]
+mask_service = tbl_BP['ServiceCode'].isin(service_codes)
+
+# Apply transformations to rows that satisfy mask_service
+tbl_BP.loc[mask_service, 'ShipDate'] = pd.to_datetime(tbl_BP.loc[mask_service, 'ShipDate'])
+tbl_BP.loc[mask_service, 'longest_side'] = tbl_BP.loc[mask_service, ['L', 'W', 'H']].max(axis=1)
+
+# Compute constant conditions
+date_conditions_1 = (tbl_BP.loc[mask_service, 'ShipDate'] >= nqd_dhl_date_1) & (tbl_BP.loc[mask_service, 'ShipDate'] <= nqd_dhl_date_2)
+date_conditions_2 = (tbl_BP.loc[mask_service, 'ShipDate'] >= nqd_dhl_date_3) & (tbl_BP.loc[mask_service, 'ShipDate'] <= nqd_dhl_date_4)
+actual_weight_condition = tbl_BP.loc[mask_service, 'ActualWeight'] >= dhl_weight_threshold
+cubic_inch_condition = tbl_BP.loc[mask_service, 'CubicInch'] >= dhl_cubic_inch_threshold_1
+girth_condition = (tbl_BP.loc[mask_service, 'GirthAndL'] > dhl_g_and_l_threshold_1) & (tbl_BP.loc[mask_service, 'GirthAndL'] <= dhl_g_and_l_threshold_2)
+
+# Compute the 'NQD_DHLG_1' column only for rows in df that satisfy the mask_service condition
+tbl_BP.loc[mask_service, 'NQD_DHLG_1'] = np.where(actual_weight_condition & cubic_inch_condition & date_conditions_2, 2.5 * tbl_BP.loc[mask_service, 'CustomerBilledWeightLb'],
+    np.where(actual_weight_condition & cubic_inch_condition & date_conditions_1, 2 * tbl_BP.loc[mask_service, 'CustomerBilledWeightLb'], 0))
+
+tbl_BP.loc[mask_service, 'NQD_DHLG_2'] = np.where(girth_condition & cubic_inch_condition & actual_weight_condition & date_conditions_2, 2.5 * tbl_BP.loc[mask_service, 'CustomerBilledWeightLb'],
+                                  np.where(girth_condition & cubic_inch_condition & actual_weight_condition & date_conditions_1, 2 * tbl_BP.loc[mask_service, 'CustomerBilledWeightLb'],
+                                  np.where(girth_condition & (~cubic_inch_condition | ~actual_weight_condition) & date_conditions_2, 2.5 * np.ceil(tbl_BP.loc[mask_service, 'ActualWeight']),
+                                  np.where(girth_condition & (~cubic_inch_condition | ~actual_weight_condition) & date_conditions_1, 2 * np.ceil(tbl_BP.loc[mask_service, 'ActualWeight']),
+                                  np.where(tbl_BP.loc[mask_service,'GirthAndL'] > dhl_g_and_l_threshold_2, np.nan, 0)))))
+
+tbl_BP.loc[mask_service, 'NQD_DHLG_3'] = np.where((tbl_BP.loc[mask_service, 'longest_side'] > dhl_max_l_threshold_2) & cubic_inch_condition & actual_weight_condition & date_conditions_2, 2.5 * tbl_BP.loc[mask_service, 'CustomerBilledWeightLb'],
+                                  np.where((tbl_BP.loc[mask_service, 'longest_side'] > dhl_max_l_threshold_2) & cubic_inch_condition & actual_weight_condition & date_conditions_1, 2 * tbl_BP.loc[mask_service, 'CustomerBilledWeightLb'],
+                                  np.where((tbl_BP.loc[mask_service, 'longest_side'] > dhl_max_l_threshold_2) & (~cubic_inch_condition | ~actual_weight_condition) & date_conditions_2, 2.5 * np.ceil(tbl_BP.loc[mask_service, 'ActualWeight']),
+                                  np.where((tbl_BP.loc[mask_service, 'longest_side'] > dhl_max_l_threshold_2) & (~cubic_inch_condition | ~actual_weight_condition) & date_conditions_1, 2 * np.ceil(tbl_BP.loc[mask_service, 'ActualWeight']), 0))))
+
+tbl_BP.loc[mask_service, 'NQD_DHLG_4'] = np.where((tbl_BP.loc[mask_service, 'longest_side'] > dhl_max_l_threshold_1) & (tbl_BP.loc[mask_service, 'longest_side'] <= dhl_max_l_threshold_3), 
+    4.5, np.where(tbl_BP.loc[mask_service, 'longest_side'] > dhl_max_l_threshold_3, 15.5, 0))
+
+tbl_BP.loc[mask_service, 'NQD_DHLG_5'] = np.where(tbl_BP.loc[mask_service, 'CubicInch'] > dhl_cubic_inch_threshold_2, 15.5, 0)
+
+cols_to_consolidate = ['NQD_DHLG_1', 'NQD_DHLG_2', 'NQD_DHLG_3', 'NQD_DHLG_4', 'NQD_DHLG_5']
+# Check for NaN values in 'NQD_DHLG_2'
+nan_condition = (tbl_BP['NQD_DHLG_2'].isna()) & mask_service
+# Compute the sum across the specified columns
+tbl_BP.loc[mask_service, 'CustomerExtra'] = tbl_BP.loc[mask_service, cols_to_consolidate].sum(axis=1)
+# If 'NQD_DHLG_2' is NaN, then set 'CustomerExtra' to NaN
+tbl_BP.loc[nan_condition, 'CustomerExtra'] = np.nan
+
+# Drop the original rate columns
+tbl_BP = tbl_BP.drop(['NQD_DHLG_1', 'NQD_DHLG_2', 'NQD_DHLG_3', 'NQD_DHLG_4', 'NQD_DHLG_5', 'longest_side'], axis=1)
+
+
+
+filtered_ClientCharge = ClientCharge[ClientCharge['ServiceCode'].isin(['DHLG', 'DHLG<1', 'DHLE', 'DHLE<1', 'DHLEM', 'USPSFC', 'USPSPS', 'USPSAP'])][['CompanyID', 'ServiceCode', 'Price']].drop_duplicates(subset=['CompanyID', 'ServiceCode', 'Price'])
+
+# Define the specific ServiceCode values you're interested in
+specific_servicecodes = ["DHLG", "DHLG<1", "DHLE", "DHLE<1", "DHLEM", "USPSFC", "USPSPS", "USPSAP"]
+
+# Step 1: Create the intermediate dataframe
+intermediate_df = tbl_BP.query('ServiceCode in @specific_servicecodes').merge(
+    filtered_ClientCharge, 
+    left_on=['CustomerID', 'ServiceCode'], 
+    right_on=['CompanyID', 'ServiceCode'], 
+    how='left'
+)
+
+# Step 2: Drop the rows in df that match the specific_servicecodes
+tbl_BP = tbl_BP.query('ServiceCode not in @specific_servicecodes')
+
+# Step 3: Append the merged dataframe
+tbl_BP = pd.concat([tbl_BP, intermediate_df], ignore_index=True)
+
+
+
+# Create a mask for rows with the specified ServiceCodes
+maskDHLAcce = tbl_BP['ServiceCode'].isin(['DHLG', 'DHLG<1', 'DHLE', 'DHLE<1', 'DHLEM'])
+
+# Update the 'CustomerExtra' column for rows matching the mask
+tbl_BP.loc[maskDHLAcce, 'CustomerExtra'] = round(tbl_BP.loc[maskDHLAcce, 'CustomerExtra'] / (1 - tbl_BP.loc[maskDHLAcce, 'Price']), 2)
+
+
+
+**add usps accessorials**
+
+service_codes = ["USPSPS", "USPSFC", "USPSAP"]
+mask_USPS = tbl_BP['ServiceCode'].isin(service_codes)
+
+conditions = [(tbl_BP['L'] > usps_l_threshold_1) & (tbl_BP['L'] <= usps_l_threshold_2), tbl_BP['L'] > usps_l_threshold_2]
+choices = [4, 7]
+tbl_BP['EXTRA_1'] = np.select(conditions, choices, default=0)
+
+condition = tbl_BP['CubicInch'] > usps_cubic_inch_threshold
+tbl_BP['EXTRA_2'] = np.where(condition, 15, 0)
+
+# Summing up the two new columns' values and storing in the "Extra" column for the desired subset of rows
+tbl_BP.loc[mask_USPS, 'CustomerExtra'] = tbl_BP.loc[mask_USPS, 'EXTRA_1'] + tbl_BP.loc[mask_USPS, 'EXTRA_2']
+
+# If you don't need the two additional columns afterwards, you can drop them
+tbl_BP = tbl_BP.drop(columns=['EXTRA_1', 'EXTRA_2'])
+
+
+# Create a mask for rows with the specified ServiceCodes
+maskUSPSAcce = tbl_BP['ServiceCode'].isin(['USPSAP', 'USPSPS', 'USPSFC'])
+
+# Update the 'CustomerExtra' column for rows matching the mask
+tbl_BP.loc[maskUSPSAcce, 'CustomerExtra'] = round(tbl_BP.loc[maskUSPSAcce, 'CustomerExtra'] / (1 - tbl_BP.loc[maskUSPSAcce, 'Price']), 2)
+
+
+
+
+**Add Fsc % (only for UPS and DHL)**
+
+
+# Specify the ServiceCodes for the three scenarios
+upsAir_calculation_1 = ["REDE", "RED", "REDS", "2DAM", "BLUE", "ORNG"]  
+upsGround_calculation_2 = ["GRND", "GRES", "SRPT", "SRPT<1"]
+dhl_calculation_3 = ["DHLG", "DHLG<1", "DHLE", "DHLE<1", "DHLEM"]
+
+
+# ups section
+tbl_BP['ShipDate'] = pd.to_datetime(tbl_BP['ShipDate'])
+# get unique values from column 'SHIP_DATE' and create a new dataframe. 
+new_df = pd.DataFrame({'ShipDate': tbl_BP['ShipDate'].unique()})
+# use this new dataframe to merge to Doc. 3 UPS section
+df_merge = new_df.merge(UPS_FSC, how='cross')
+#slice the merged dataframe to make sure ship_date is between the ship_data_start and end. Now we have Doc. 3 with Ship_date column to merge back to pld so that the pld can get FSC%.
+df_merge = df_merge.query('ShipDate >= ShipDateStart and ShipDate <= ShipDateEnd')
+# Get dhl FSC% to pld
+tbl_BP = tbl_BP.merge(df_merge, on=['ShipDate'], how='left').drop(['ShipDateStart', 'ShipDateEnd'], axis=1)
+
+
+# dhl section
+# use this new dataframe to merge to Doc. 3 DHL section
+df_merge = new_df.merge(DHL_FSC, how='cross')
+df_merge = df_merge.query('ShipDate >= ShipDateStart and ShipDate <= ShipDateEnd')
+tbl_BP = tbl_BP.merge(df_merge, on=['ShipDate'], how='left').drop(['ShipDateStart', 'ShipDateEnd'], axis=1)
+
+
+# pick rates from the 3 FSC% columns based on ServiceCode
+tbl_BP['FscRate'] = np.where(tbl_BP['ServiceCode'].isin(upsAir_calculation_1), tbl_BP['Domestic Air'], 
+                         np.where(tbl_BP['ServiceCode'].isin(upsGround_calculation_2), tbl_BP['Ground'], 
+                                  np.where(tbl_BP['ServiceCode'].isin(dhl_calculation_3), tbl_BP['FSC'], np.nan)))
+
+
+# Drop the original rate columns
+tbl_BP = tbl_BP.drop(['Domestic Air', 'Ground', 'FSC'], axis=1)
+
+
+
+**Get FSC (only for UPS and DHL)**
+
+# Specify the ServiceCodes for the three scenarios
+specific_servicecodes_upsFsc = ["REDE", "RED", "REDS", "2DAM", "BLUE", "ORNG", "GRND", "GRES", "SRPT", "SRPT<1"]  
+
+specific_servicecodes_dhlFsc = ["DHLG", "DHLG<1", "DHLE", "DHLE<1", "DHLEM"]  
+
+
+# Compute PublishedFsc for UPS
+mask_upsFsc = tbl_BP['ServiceCode'].isin(specific_servicecodes_upsFsc)
+tbl_BP.loc[mask_upsFsc, 'PublishedFsc'] = round((tbl_BP['PublishedFreight'] + tbl_BP['PublishedRes'] + tbl_BP['PublishedDas'] + tbl_BP['PublishedAhs']) * tbl_BP['FscRate'],2)
+# Compute CustomerFsc for UPS
+tbl_BP.loc[mask_upsFsc, 'CustomerFsc'] = round((tbl_BP['CustomerFreight'] + tbl_BP['CustomerRes'] + tbl_BP['CustomerDas'] + tbl_BP['CustomerAhs']) * tbl_BP['FscRate'],2)
+
+mask_dhlFsc = tbl_BP['ServiceCode'].isin(specific_servicecodes_dhlFsc)
+
+# Compute CustomerFsc for DHL
+tbl_BP.loc[mask_dhlFsc, 'CustomerFsc'] = np.where((tbl_BP.loc[mask_dhlFsc, 'ActualWeight'] <= 1), (tbl_BP.loc[mask_dhlFsc, 'FscRate'] * tbl_BP.loc[mask_dhlFsc, 'ActualWeight']) / (1 - tbl_BP.loc[mask_dhlFsc, 'Price']),
+         np.where((tbl_BP.loc[mask_dhlFsc, 'ActualWeight'] > 1), (tbl_BP.loc[mask_dhlFsc, 'FscRate'] * tbl_BP.loc[mask_dhlFsc, 'CustomerBilledWeightLb']) / (1 - tbl_BP.loc[mask_dhlFsc, 'Price']), 0))
+
+
+**Get Total**
+
+# Specify the ServiceCodes for the three scenarios
+specific_servicecodes_UPS = ["REDE", "RED", "REDS", "2DAM", "BLUE", "ORNG", "GRND", "GRES", "SRPT", "SRPT<1"]  
+
+specific_servicecodes_DHL = ["DHLG", "DHLG<1", "DHLE", "DHLE<1", "DHLEM"]  
+
+specific_servicecodes_USPS = ["USPSFC", "USPSPS", "USPSAP"]  
+
+
+# Compute PublishedTotal for UPS
+mask_UPS = tbl_BP['ServiceCode'].isin(specific_servicecodes_UPS)
+tbl_BP.loc[mask_UPS, 'PublishedTotal'] = round(tbl_BP['PublishedFreight'] + tbl_BP['PublishedRes'] + tbl_BP['PublishedDas'] + tbl_BP['PublishedAhs'] + tbl_BP['PublishedFsc'],2)
+
+# Compute CustomerTotal for UPS
+tbl_BP.loc[mask_UPS, 'CustomerTotal'] = round(tbl_BP['CustomerFreight'] + tbl_BP['CustomerRes'] + tbl_BP['CustomerDas'] + tbl_BP['CustomerAhs'] + tbl_BP['CustomerFsc'],2)
+
+# Compute CustomerTotal for DHL
+mask_DHL = tbl_BP['ServiceCode'].isin(specific_servicecodes_DHL)
+tbl_BP.loc[mask_DHL, 'CustomerTotal'] = round(tbl_BP['CustomerFreight'] + tbl_BP['CustomerExtra'] + tbl_BP['CustomerFsc'],2)
+
+# Compute CustomerTotal for USPS
+mask_USPS = tbl_BP['ServiceCode'].isin(specific_servicecodes_USPS)
+tbl_BP.loc[mask_USPS, 'CustomerTotal'] = round(tbl_BP['CustomerFreight'] + tbl_BP['CustomerExtra'],2)
+
+
+# Filter rows where 'exclude_rates' column value is in the provided list
+condition = ~tbl_BP['ServiceCode'].isin(["REDE", "RED", "REDS", "2DAM", "BLUE", "ORNG", "GRND", "GRES", "SRPT", "SRPT<1"])
+
+# If the condition is met, then set 'PublishedFreight' to NaN
+tbl_BP.loc[condition, 'PublishedFreight'] = np.nan
+
+
+# If you don't need the two additional columns afterwards, you can drop them
+tbl_BP = tbl_BP.drop(columns=['CompanyID', 'Price'])
+
+
+
+# Handle JO special case
+tbl_BP.loc[
+    (tbl_BP['CustomerID'] == 9019) &
+    (tbl_BP['ServiceCode'].isin(['RED','REDS'])) &
+    (tbl_BP['CustomerFreight'] == 27),
+    'CustomerTotal'
+] = 27
+
+
+tbl_BP.loc[
+    (tbl_BP['CustomerID'] == 9019) &
+    (tbl_BP['ServiceCode'].isin(['2DAM','BLUE'])) &
+    (tbl_BP['CustomerFreight'] == 17),
+    'CustomerTotal'
+] = 17
+
+
+tbl_BP.loc[
+    (tbl_BP['CustomerID'] == 9019) &
+    (tbl_BP['ServiceCode'].isin(['RED','REDS'])) &
+    (tbl_BP['CustomerFreight'] == 27),
+    ['CustomerRes', 'CustomerDas', 'CustomerAhs', 'CustomerFsc']
+] = [0, 0, 0, 0]
+
+
+tbl_BP.loc[
+    (tbl_BP['CustomerID'] == 9019) &
+    (tbl_BP['ServiceCode'].isin(['2DAM','BLUE'])) &
+    (tbl_BP['CustomerFreight'] == 17),
+    ['CustomerRes', 'CustomerDas', 'CustomerAhs', 'CustomerFsc']
+] = [0, 0, 0, 0]
+
+
+**Calculate the savings and Savings %**
+
+# Calculate for Customer Resi, Das, and Ahs rates
+tbl_BP['Savings'] = round(tbl_BP['PublishedTotal'] - tbl_BP['CustomerTotal'],2)
+tbl_BP['SavingsPct'] = round((tbl_BP['PublishedTotal'] - tbl_BP['CustomerTotal'])/tbl_BP['PublishedTotal'],2)
+
+tbl_BP = tbl_BP.reindex(columns=['CustomerID', 'CustomerName', 'Facility', 'BarrettOrderNumber', 
+                                 'Reference', 'PoNumber', 'TrackingNumber', 'ShipDate', 'Service',
+                                 'Shipper', 'ShipToName', 'Contact', 'City', 'State', 'ZipCode',
+                                 'Country', 'Zone', 'Quantity', 'ActualWeight', 'ResidentialFlag', 'L', 
+                                 'W', 'H', 'GirthAndL', 'CubicInch', 'FromZip', 'ServiceCode', 'DASCategory', 
+                                 'FscRate', 'CustomerBilledWeightLb', 'CustomerBilledWeightOz', 'CustomerFreight', 
+                                 'CustomerRes', 'CustomerDas', 'CustomerAhs', 'CustomerExtra', 'CustomerFsc', 
+                                 'CustomerTotal', 'PublishedBilledWeightLb', 'PublishedBilledWeightOz', 'PublishedFreight', 
+                                 'PublishedRes', 'PublishedDas', 'PublishedAhs', 'PublishedFsc', 'PublishedTotal', 'Savings', 'SavingsPct'])
+
+
+
+# Columns you want to fill
+cols_to_fill = ['CustomerFsc', 'PublishedFsc']
+
+# Fill NaN in the specified columns with 0 for easier calculation later
+tbl_BP[cols_to_fill] = tbl_BP[cols_to_fill].fillna(0)
+
+
+
+# Columns to format
+cols_to_format_1 = ['CustomerFreight', 'CustomerRes', 'CustomerDas', 'CustomerAhs', 'CustomerExtra', 'CustomerFsc', 'CustomerTotal', 
+                  'PublishedFreight', 'PublishedRes', 'PublishedDas', 'PublishedAhs', 'PublishedFsc', 'PublishedTotal', 'Savings']
+
+# Columns to format
+cols_to_format_2 = ['FscRate', 'SavingsPct']
+
+# Apply currency format
+tbl_BP[cols_to_format_1] = tbl_BP[cols_to_format_1].applymap(lambda x: '${:,.2f}'.format(x) if pd.notna(x) else x)
+
+# Apply percentage format
+tbl_BP[cols_to_format_2] = tbl_BP[cols_to_format_2].applymap(lambda x: '{:.2%}'.format(x) if pd.notna(x) else x)
+
+
+**Section 4. Analysis-pending**
+
+""""""""""
+
+filtered_df = tbl_BP[tbl_BP['Service'].str.contains('UPS', case=False, na=False)]
+
+# only ups
+# daily report is restricted to: only shipper for Jacobson: BARJACOBSON_GBM
+# ndd, vibram, make a fort, np, blueshift everything, for JO, it is not enough in snowflake.     
+
+
+# Group by 'Company' and 'Order-ID', then sum 'Total'
+aggregation_functions = {'TrackingNumber': 'count', 'PublishedTotal':'sum', 'CustomerTotal': 'sum', 'Savings': 'sum'} 
+
+# Group by 'Reference' and 'Company', then aggregate using sum and count
+filtered_df_pivot = filtered_df.groupby(['CustomerID', 'CustomerName', 'BarrettOrderNumber', 'Reference', 'ShipToName']).agg(aggregation_functions).reset_index()
+
+# Rename the columns for clarity
+filtered_df_pivot.columns = ['CustomerID', 'CustomerName', 'BarrettOrderNumber', 'Reference', 'ShipToName', 'PackageCount', 'PublishedTotal', 'CustomerTotal', 'Savings']
+
+filtered_df_pivot['Savings'] = filtered_df_pivot['Savings'].astype(float)
+filtered_df_pivot['PublishedTotal'] = filtered_df_pivot['PublishedTotal'].astype(float)
+filtered_df_pivot['SavingsPct'] = filtered_df_pivot['Savings'] / filtered_df_pivot['PublishedTotal']
+
+# Concatenate the total row to the pivot table
+filtered_df_pivot['SavingsPct'] = filtered_df_pivot['Savings']/filtered_df_pivot['PublishedTotal']
+filtered_df_pivot['AveragePublishedCost'] = filtered_df_pivot['PublishedTotal']/filtered_df_pivot['PackageCount']
+filtered_df_pivot['AverageCustomerCost'] = filtered_df_pivot['CustomerTotal']/filtered_df_pivot['PackageCount']
+filtered_df_pivot['SavingsPerPkg)'] = filtered_df_pivot['AveragePublishedCost'] - filtered_df_pivot['AverageCustomerCost']
+filtered_df_pivot['AverageSavingsPct'] = filtered_df_pivot['SavingsPerPkg)']/filtered_df_pivot['AveragePublishedCost']
+
+# Calculate the total row
+total_row = pd.DataFrame({
+    'Reference': ['Grand Total'],
+    'ShipToName': [''],
+    'PackageCount': [filtered_df_pivot['PackageCount'].sum()],
+    'PublishedTotal': [filtered_df_pivot['PublishedTotal'].sum()],
+    'CustomerTotal': [filtered_df_pivot['CustomerTotal'].sum()],
+    'Savings': [filtered_df_pivot['Savings'].sum()],
+    'SavingsPct': [filtered_df_pivot['SavingsPct'].mean()],
+    'AveragePublishedCost': [filtered_df_pivot['AveragePublishedCost'].mean()],
+    'AverageCustomerCost': [filtered_df_pivot['AverageCustomerCost'].mean()],
+    'SavingsPerPkg': [filtered_df_pivot['SavingsPerPkg'].mean()],
+    'AverageSavingsPct': [filtered_df_pivot['AverageSavingsPct'].mean()]
+})
+
+filtered_df_pivot = pd.concat([filtered_df_pivot, total_row], ignore_index=True)
+filtered_df_pivot['SavingsPct'] = filtered_df_pivot['SavingsPct'].apply(lambda x: f"{x * 100:.2f}%")
+filtered_df_pivot['AverageSavingsPct'] = filtered_df_pivot['AverageSavingsPct'].apply(lambda x: f"{x * 100:.2f}%")
+
+filtered_df_pivot['AveragePublishedCost'] = round(filtered_df_pivot['AveragePublishedCost'],2)
+filtered_df_pivot['AverageCustomerCost'] = round(filtered_df_pivot['AverageCustomerCost'],2)
+filtered_df_pivot['SavingsPerPkg'] = round(filtered_df_pivot['SavingsPerPkg'],2)
+
+
+# Create an Excel writer object
+excel_writer = pd.ExcelWriter('Daily Rerate File XX-XX-XXXX.xlsx', engine='xlsxwriter')
+
+# Write DataFrame 1 to the first sheet
+filtered_df.to_excel(excel_writer, sheet_name='Rates', index=False)
+
+# Write DataFrame 2 to the second sheet
+filtered_df_pivot.to_excel(excel_writer, sheet_name='Dashboard', index=False)
+
+# Save the Excel file
+excel_writer.save()
+
+# Blueshift
+# Jacobson
+# Johnnie-o in 1 report
+# NDD
+# Vibram
+# Nature Planet
+# Make a Fort
+
+
+tbl_BP.to_csv('test.csv')
+
+
+
+
+
+
+
+
+
+**back-up Note below**
+
+
+#df.loc[df['TrackingNumber'] == '"9261299999158851316230']
+
+df.to_csv('test.csv')
+
+
+'''''''''''
+#The rounding difference between python (new model) and excel (current model) will exist for some time until it has become a considerable issue. It is hard but not impossible to fix. 
+
+Excel: always round up with a number 5. For example, round(2.925,2) = 2.93 
+Python: will round down with 5 when the decimal place is even. For example, 
+round(2.925,2) = 2.92, 
+round(2.9925,3) = 2.993
+round(2.99925,4) = 2.9992
+round(2.999925,5) = 2.9993
+round(2.9999925,6) = 2.999992
+
+The estimated rate difference in the worst-case scenario: 
+roundup with resi charge $2.93 in excel but $2.92 in python will bring $0.02 difference in total charge of a package (margin and fsc added so that $0.01 turns to around $0.02). The worst case scenario saw so far, the Johnnie-o PLD 2023 YTD 130k ups ground package has a total of $800 difference between excel and python rerate result.     
+
+# Convert columns 'L', 'W', and 'H' to numeric
+tbl_BP[['L', 'W', 'H']] = tbl_BP[['L', 'W', 'H']].apply(pd.to_numeric)
+
+# ROUNDUP equivalent in Python for 2 decimal places
+tbl_BP['L'] = tbl_BP['L'].apply(lambda x: np.ceil(x * 100) / 100)
+tbl_BP['W'] = tbl_BP['W'].apply(lambda x: np.ceil(x * 100) / 100)
+tbl_BP['H'] = tbl_BP['H'].apply(lambda x: np.ceil(x * 100) / 100)
+
+''''''''''''''
+
+
+
