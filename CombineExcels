@@ -1,0 +1,95 @@
+#Combine the excels into 1 clean table
+
+import numpy as np
+import pandas as pd
+import zipfile
+import os
+
+--------------# Extract the excels from the zip file and save to a designated folder
+
+# Specify the file path of the zip file
+zip_file_path = 'C:\\Users\\xx\\xx\\xx\\xx\\xx' 
+
+# Create a directory to save the extracted tables
+output_directory = 'C:\\Users\\xx\\xx\\xx\\xx\\xx'  # Modify with your desired output directory
+os.makedirs(output_directory, exist_ok=True)
+
+# Open the zip file
+with zipfile.ZipFile(zip_file_path, 'r') as zip_file:
+    # Extract each file in the zip
+    for file_name in zip_file.namelist():
+        # Extract the file
+        zip_file.extract(file_name, output_directory)
+        
+        # Print the file name
+        print(f"Extracted: {file_name}")
+
+
+---------------# Delete the calculcations (Grand Total, etc) outside every table
+
+directory = 'C:\\Users\\xx\\xx\\xx\\xx\\xx' 
+
+# delete the numbers outside the tables. 
+# Iterate over each file in the directory
+for filename in os.listdir(directory):
+    # Check if the file is an Excel file
+    if filename.endswith(".xlsx") or filename.endswith(".xls"):
+        # Read the Excel file
+        file_path = os.path.join(directory, filename)
+        df = pd.read_excel(file_path)
+
+        # Find the row index where the table ends
+        end_row_index = df[df.iloc[:, 0].isnull()].index[0]
+
+        # Slice the DataFrame to keep only the rows representing the table
+        table_df = df.iloc[:end_row_index, :]
+        
+        # Perform further operations with the table DataFrame
+        # For example, you can save it to a file, process the data, etc.
+        table_df.to_excel(f"processed_{filename}", index=False)
+
+
+------------------# Combine all excel tables into 1 table 
+# Specify the directory path
+directory_path = "C:\\Users\\xx\\xx\\xx\\xx\\xx"
+
+# Initialize an empty list to store the tables
+tables = []
+
+# Iterate over each file in the directory
+for filename in os.listdir(directory_path):
+    # Check if the file is an Excel file
+    if filename.endswith(".xlsx") or filename.endswith(".xls"):
+        # Read the Excel file into a DataFrame
+        file_path = os.path.join(directory_path, filename)
+        df = pd.read_excel(file_path)
+        
+        # Append the DataFrame to the list
+        tables.append(df)
+
+# Concatenate the tables together
+combined_df = pd.concat(tables, ignore_index=True)
+
+
+-----------------# Clean the columns and rows
+# Drop columns that are completely blank
+df = df.dropna(axis=1, how='all')
+
+# Drop rows that are completely blank
+df = df.dropna(axis=0, how='all')
+
+# Group similar columns, transfer the value from the columns with 
+df.loc[df['Length'] == '', 'Length'] = df['L']
+df = df.drop(['L'], axis=1)
+
+###
+
+
+
+
+
+
+
+
+
+
