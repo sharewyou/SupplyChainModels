@@ -1,5 +1,5 @@
 # Rate_Automation
-# Rate_Automation
+
 **This model will rate packages under the actual services shown in PLD**
 
 *********Structure & Input*********
@@ -46,7 +46,7 @@ Doc. 6. PLD: package level detail as an input table
 | MI      | MIPH (MI Parcel Select Heavyweight)|  both | lb | Company |
 
 
-**Client rate calculation based on Pub rate and Barrett rate**
+**Client rate calculation based on Pub rate and Company rate**
 
 | Carrier | Service | Client Rate Calculation   |
 |:--------|:---------|:-------------|
@@ -571,7 +571,7 @@ tbl_BP.loc[condition_2, 'CustomerBilledWeightOz'] = tbl_BP[condition_2].apply(cu
 
 
 
-**Add Freight Rates (Published & Barrett Rate) to PLD**
+**Add Freight Rates (Published & Company Rate) to PLD**
 
 # Add Freight Rates to PLD. 
 
@@ -580,9 +580,9 @@ tbl_BP.loc[condition_2, 'CustomerBilledWeightOz'] = tbl_BP[condition_2].apply(cu
 group_1 = ['REDE', 'RED', 'REDS', '2DAM', 'BLUE', 'ORNG', 'GRND', 'GRES', 'SRPT'] 
 # Published Rates & Oz
 group_2 = ['SRPT<1']  
-# Barrett Rates & Lb
+# Company Rates & Lb
 group_3 = ['USPSPS', 'USPSAP', 'MIPH']  
-# Barrett Rates & Oz
+# Company Rates & Oz
 group_4 = ['USPSFC', 'USPSAP', 'MIPLE']  
 
 # 1. Merge for Published Rates & Lb
@@ -607,7 +607,7 @@ tbl_BP = tbl_BP.merge(
     left_on=['ServiceCode', 'CustomerBilledWeightLb', 'Zone'],
     right_on=['ServiceCode', 'WeightLb', 'Zone'],
     how='left'
-).rename(columns={'BarrettRate': 'BarrettRate_Lb'}).drop(columns='WeightLb')
+).rename(columns={'CompanyRate': 'CompanyRate_Lb'}).drop(columns='WeightLb')
 
 # Set the 'CompanyRate_Lb' values to NaN for rows that meet this condition as we want to use oversize rate rather than this rate
 mask_1 = (tbl_BP['GirthAndL'] > 108) & (tbl_BP['GirthAndL'] <= 130)
@@ -620,36 +620,36 @@ tbl_BP.loc[mask_2, 'CompanyRate_Lb'] = np.nan
 
 # Use the mask to merge only those rows directly in tbl_BP
 merged_subset = tbl_BP[mask_1].merge(
-    FreightCharge[(FreightCharge['ServiceCode'] == 'USPSPS') & (FreightCharge['WeightLb'] == 9999)][['ServiceCode', 'Zone', 'BarrettRate']],
+    FreightCharge[(FreightCharge['ServiceCode'] == 'USPSPS') & (FreightCharge['WeightLb'] == 9999)][['ServiceCode', 'Zone', 'CompanyRate']],
     left_on=['ServiceCode', 'Zone'],
     right_on=['ServiceCode', 'Zone'],
     how='left'
 )
 
-# Now, assign the 'BarrettRate' values from the merged subset back to 'BarrettRate_Lb' in the original tbl_BP where the mask is True
-tbl_BP.loc[mask_1, 'BarrettRate_Lb'] = merged_subset['BarrettRate']
+# Now, assign the 'CompanyRate' values from the merged subset back to 'CompanyRate_Lb' in the original tbl_BP where the mask is True
+tbl_BP.loc[mask_1, 'CompanyRate_Lb'] = merged_subset['CompanyRate']
 
 
-# 4. Merge for Barrett Rates & Oz
+# 4. Merge for Company Rates & Oz
 tbl_BP = tbl_BP.merge(
-    FreightCharge[FreightCharge['BarrettRate'].notna() & FreightCharge['ServiceCode'].isin(group_4)][['ServiceCode', 'WeightOz', 'Zone', 'BarrettRate']],
+    FreightCharge[FreightCharge['CompanyRate'].notna() & FreightCharge['ServiceCode'].isin(group_4)][['ServiceCode', 'WeightOz', 'Zone', 'CompanyRate']],
     left_on=['ServiceCode', 'CustomerBilledWeightOz', 'Zone'],
     right_on=['ServiceCode', 'WeightOz', 'Zone'],
     how='left'
-).rename(columns={'BarrettRate': 'BarrettRate_Oz'}).drop(columns='WeightOz')
+).rename(columns={'CompanyRate': 'CompanyRate_Oz'}).drop(columns='WeightOz')
 
 
-# Combine all the Rate columns into one 'Rate' column. This column is a combination of Published Rate and Barrett Rate. 
-tbl_BP['Rate'] = tbl_BP['PublishedRate_Lb'].combine_first(tbl_BP['PublishedRate_Oz']).combine_first(tbl_BP['BarrettRate_Lb']).combine_first(tbl_BP['BarrettRate_Oz'])
+# Combine all the Rate columns into one 'Rate' column. This column is a combination of Published Rate and Company Rate. 
+tbl_BP['Rate'] = tbl_BP['PublishedRate_Lb'].combine_first(tbl_BP['PublishedRate_Oz']).combine_first(tbl_BP['CompanyRate_Lb']).combine_first(tbl_BP['CompanyRate_Oz'])
 
 # Drop the intermediate Rate columns
-columns_to_drop = ['PublishedRate_Lb', 'PublishedRate_Oz', 'BarrettRate_Lb', 'BarrettRate_Oz']
+columns_to_drop = ['PublishedRate_Lb', 'PublishedRate_Oz', 'CompanyRate_Lb', 'CompanyRate_Oz']
 tbl_BP.drop(columns=columns_to_drop, inplace=True)
 
 # DHL section. This is separate because DHL needs additional merge to Facility. 
-#Barrett Rate and Lb
+#Company Rate and Lb
 group_5 = ['DHLG', 'DHLE', 'DHLEM'] 
-#Barrett Rate and Oz
+#Company Rate and Oz
 group_6 = ['DHLG<1', 'DHLE<1', 'DHLEM']  
 
 # Define the mask to select rows where ServiceCode starts with 'DHL'
@@ -665,24 +665,24 @@ key_mapping = {
 tbl_BP['key_mapped'] = tbl_BP['Facility'].map(key_mapping)
 
 tbl_BP = tbl_BP.merge(
-    FreightCharge[FreightCharge['ServiceCode_DHL'].notna() & FreightCharge['ServiceCode_DHL'].isin(group_5)][['ServiceCode_DHL', 'Facility_DHL', 'WeightLb', 'Zone', 'BarrettRate']],
+    FreightCharge[FreightCharge['ServiceCode_DHL'].notna() & FreightCharge['ServiceCode_DHL'].isin(group_5)][['ServiceCode_DHL', 'Facility_DHL', 'WeightLb', 'Zone', 'CompanyRate']],
     left_on=['ServiceCode', 'key_mapped', 'CustomerBilledWeightLb', 'Zone'],
     right_on=['ServiceCode_DHL', 'Facility_DHL', 'WeightLb', 'Zone'],
     how='left'
-).rename(columns={'BarrettRate': 'BarrettRate_Lb'}).drop(columns=['ServiceCode_DHL', 'Facility_DHL', 'WeightLb'])
+).rename(columns={'CompanyRate': 'CompanyRate_Lb'}).drop(columns=['ServiceCode_DHL', 'Facility_DHL', 'WeightLb'])
 
 tbl_BP = tbl_BP.merge(
-    FreightCharge[FreightCharge['ServiceCode_DHL'].notna() & FreightCharge['ServiceCode_DHL'].isin(group_6)][['ServiceCode_DHL', 'Facility_DHL', 'WeightOz', 'Zone', 'BarrettRate']],
+    FreightCharge[FreightCharge['ServiceCode_DHL'].notna() & FreightCharge['ServiceCode_DHL'].isin(group_6)][['ServiceCode_DHL', 'Facility_DHL', 'WeightOz', 'Zone', 'CompanyRate']],
     left_on=['ServiceCode', 'key_mapped', 'CustomerBilledWeightOz', 'Zone'],
     right_on=['ServiceCode_DHL', 'Facility_DHL', 'WeightOz', 'Zone'],
     how='left'
-).rename(columns={'BarrettRate': 'BarrettRate_Oz'}).drop(columns=['ServiceCode_DHL', 'Facility_DHL', 'WeightOz', 'key_mapped'])
+).rename(columns={'CompanyRate': 'CompanyRate_Oz'}).drop(columns=['ServiceCode_DHL', 'Facility_DHL', 'WeightOz', 'key_mapped'])
 
 # Combine all the Rate columns into one 'Rate' column
-tbl_BP['Rate'] = tbl_BP['Rate'].combine_first(tbl_BP['BarrettRate_Lb']).combine_first(tbl_BP['BarrettRate_Oz'])
+tbl_BP['Rate'] = tbl_BP['Rate'].combine_first(tbl_BP['CompanyRate_Lb']).combine_first(tbl_BP['CompanyRate_Oz'])
 
 # Drop the intermediate Rate columns
-columns_to_drop = ['BarrettRate_Lb', 'BarrettRate_Oz']
+columns_to_drop = ['CompanyRate_Lb', 'CompanyRate_Oz']
 tbl_BP.drop(columns=columns_to_drop, inplace=True)
 
 
@@ -766,7 +766,7 @@ tbl_BP = tbl_BP.merge(
 # Filter rows where 'exclude_rates' column value is in the provided list
 condition = ~tbl_BP['ServiceCode'].isin(["REDE", "RED", "REDS", "2DAM", "BLUE", "ORNG", "GRND", "GRES", "SRPT", "SRPT<1"])
 
-# If the condition is met, then set 'PublishedFreight' to NaN because they are actually Barrett Rate here if not UPS 
+# If the condition is met, then set 'PublishedFreight' to NaN because they are actually Company Rate here if not UPS 
 tbl_BP.loc[condition, 'PublishedFreight'] = np.nan
 
 
@@ -1214,7 +1214,7 @@ tbl_BP.loc[
 tbl_BP['Savings'] = round(tbl_BP['PublishedTotal'] - tbl_BP['CustomerTotal'],2)
 tbl_BP['SavingsPct'] = round((tbl_BP['PublishedTotal'] - tbl_BP['CustomerTotal'])/tbl_BP['PublishedTotal'],2)
 
-tbl_BP = tbl_BP.reindex(columns=['CustomerID', 'CustomerName', 'Facility', 'BarrettOrderNumber', 
+tbl_BP = tbl_BP.reindex(columns=['CustomerID', 'CustomerName', 'Facility', 'CompanyOrderNumber', 
                                  'Reference', 'PoNumber', 'TrackingNumber', 'ShipDate', 'Service',
                                  'Shipper', 'ShipToName', 'Contact', 'City', 'State', 'ZipCode',
                                  'Country', 'Zone', 'Quantity', 'ActualWeight', 'ResidentialFlag', 'L', 
@@ -1263,10 +1263,10 @@ filtered_df = tbl_BP[tbl_BP['Service'].str.contains('UPS', case=False, na=False)
 aggregation_functions = {'TrackingNumber': 'count', 'PublishedTotal':'sum', 'CustomerTotal': 'sum', 'Savings': 'sum'} 
 
 # Group by 'Reference' and 'Company', then aggregate using sum and count
-filtered_df_pivot = filtered_df.groupby(['CustomerID', 'CustomerName', 'BarrettOrderNumber', 'Reference', 'ShipToName']).agg(aggregation_functions).reset_index()
+filtered_df_pivot = filtered_df.groupby(['CustomerID', 'CustomerName', 'CompanyOrderNumber', 'Reference', 'ShipToName']).agg(aggregation_functions).reset_index()
 
 # Rename the columns for clarity
-filtered_df_pivot.columns = ['CustomerID', 'CustomerName', 'BarrettOrderNumber', 'Reference', 'ShipToName', 'PackageCount', 'PublishedTotal', 'CustomerTotal', 'Savings']
+filtered_df_pivot.columns = ['CustomerID', 'CustomerName', 'CompanyOrderNumber', 'Reference', 'ShipToName', 'PackageCount', 'PublishedTotal', 'CustomerTotal', 'Savings']
 
 filtered_df_pivot['Savings'] = filtered_df_pivot['Savings'].astype(float)
 filtered_df_pivot['PublishedTotal'] = filtered_df_pivot['PublishedTotal'].astype(float)
