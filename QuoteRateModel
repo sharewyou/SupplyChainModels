@@ -1,7 +1,7 @@
+# Quote_Rate_Automation
 
+**This model will quote packages for one client each time under UPS, DHL, and USPS.**
 
-
-# ======Re-rate Quote Model===============
 
 # Set Client Margin 
 
@@ -29,57 +29,39 @@ Margin_on_MI = 0.0
 # Carrier Dim Factor 2023
 
 #Dim factor 2023
-dim_factor_ups = 280
-dim_factor_ups_srpt = 139
-dim_factor_dhl = 166
-dim_factor_usps = 166
-dim_factor_mi = 166
+dim_factor_ups = 
+dim_factor_ups_srpt = 
+dim_factor_dhl = 
+dim_factor_usps = 
+dim_factor_mi = 
 
 # Set Basic Filter
 
 # ========================UPS==============================================
 #REDE (UPS NDA Early): commercial & residential, lb    
-
 #RED (UPS NDA): commercial & residential, lb
-
 #REDS (UPS NDA Saver): commercial & residential, lb
-
 #2DAM (UPS 2DA A.M.): commercial & residential, lb
-
 #BLUE (UPS 2DA): commercial & residential, lb
-
 #ORNG (UPS 3DA): commercial & residential, lb
-
 #GRND (UPS Ground Commercial): commercial only, lb
-
 #GRES (UPS Ground Residential): residential only, lb
-
 #SRPT<1 (UPS Surepost 1#>): commercial & residential, oz
-
 #SRPT (UPS Surepost): commercial & residential, lb
-
 
 # =========================DHL====================================
 #DHLG (DHL SmartMail Parcel Plus Ground 1-25): commercial & residential, lb
-
 #DHLG<1 (DHL SmartMail Parcel Ground < 1lb): commercial & residential, oz
-
 #DHLE (DHL SmartMail Parcel Plus Expedited 1-25): commercial & residential, lb
-
 #DHLE<1 (DHL SmartMail Parcel Expedited  < 1lb): commercial & residential, oz
-
 #DHLEM (DHL SmartMail Parcel Expedited Max): commercial & residential, oz
 
 # =========================USPS===============================================
-
 #USPSAG (USPS Auctane GRND): commercial & residential, lb
-
 #USPSAP (USPS Auctane PM): commercial & residential, lb
 
 # ==========================MI===============================================
-
 #MIPLE (MI Parcel Select Lightweight Expedited): commercial & residential, oz
-
 #MIPH (MI Parcel Select Heavyweight): commercial & residential, lb
 
 
@@ -87,40 +69,27 @@ dim_factor_mi = 166
 
 Source tables:
 1. carrierRateCard_2023: published freight rate card (insert newer version once a year)
-
    1-1. UPSAccessorial_2023: UPS accessorial rate card. (insert newer version once a year)
 
-
 2. areaSurchargeZipsUs_2023: a table to assign the type of DAS Category (insert newer version once a year)
-
 3. FSC: fuel surcharge rate (insert a new number once a week before automation)
-
 4. zip_Outbound: after decided the origin facility, get zone from destination zip 
-
 5. ZiptoState: get state from destination zip to decide the origin facility
-    
 6. PLD: for rerate
 
 Structure:
 
 1 - a. Create Freight Rate Card (tbl_PublishedRates)
-
-1 - b. Create Freight Rate Card (tbl_BarrettRates)
-
+1 - b. Create Freight Rate Card (tbl_CompanyRates)
 1 - c. Create Freight Rate Card (tbl_clientRates)
-
 2 - a. Create UPS accessorial rates
-
 2 - b. Prepare all other rates for rerate
-
 3 - a. Prepare PLD for rerate: Load, Clean, and Format PLD
-
 3 - b. Rerate Begin
-
 3 - c. Output and analysis
 
 # Step 1 - a. Create Freight Rate Card (tbl_PublishedRates) 
-*rate card: Add UPS published rates, DHL Barrett rates, and USPS Barrett rates. Needs to renew once a year. Can add more carriers later.
+*rate card: Add UPS published rates, DHL Company rates, and USPS Company rates. Needs to renew once a year. Can add more carriers later.
 
 import pandas as pd
 import numpy as np
@@ -220,11 +189,8 @@ df13_48 = pd.read_excel(xls, 'DHLE_5123283')
 df14_49 = pd.read_excel(xls, 'DHLE<1_5123283')
 df15_50 = pd.read_excel(xls, 'DHLEM_5123283')
 
-
-
-
 # Re-arrange the tables
-# REDE, Barrett Rates = Published Rates. 
+# REDE, Company Rates = Published Rates. 
 # made sure the tables are completely loaded into the dataframe by checking df1.shape
 
 df1 = df1.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='PUBLISHED_RATES')
@@ -238,71 +204,71 @@ df8 = df8.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_i
 df9 = df9.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='PUBLISHED_RATES')
 df10 = df10.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='PUBLISHED_RATES')
 
-df16 = df16.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
-df17 = df17.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
+df16 = df16.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
+df17 = df17.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
 
-df18 = df18.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
-df19 = df19.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
+df18 = df18.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
+df19 = df19.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
 
-df11_1 = df11_1.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
-df12_2 = df12_2.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
-df13_3 = df13_3.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
-df14_4 = df14_4.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
-df15_5 = df15_5.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
+df11_1 = df11_1.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
+df12_2 = df12_2.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
+df13_3 = df13_3.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
+df14_4 = df14_4.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
+df15_5 = df15_5.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
 
-df11_6 = df11_6.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
-df12_7 = df12_7.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
-df13_8 = df13_8.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
-df14_9 = df14_9.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
-# df15_10 = df15_10.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
+df11_6 = df11_6.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
+df12_7 = df12_7.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
+df13_8 = df13_8.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
+df14_9 = df14_9.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
+# df15_10 = df15_10.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
 
-df11_11 = df11_11.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
-df12_12 = df12_12.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
-df13_13 = df13_13.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
-df14_14 = df14_14.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
-df15_15 = df15_15.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
+df11_11 = df11_11.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
+df12_12 = df12_12.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
+df13_13 = df13_13.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
+df14_14 = df14_14.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
+df15_15 = df15_15.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
 
-df11_16 = df11_16.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
-df12_17 = df12_17.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
-df13_18 = df13_18.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
-df14_19 = df14_19.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
-df15_20 = df15_20.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
+df11_16 = df11_16.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
+df12_17 = df12_17.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
+df13_18 = df13_18.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
+df14_19 = df14_19.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
+df15_20 = df15_20.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
 
-df11_21 = df11_21.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
-df12_22 = df12_22.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
-df13_23 = df13_23.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
-df14_24 = df14_24.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
-df15_25 = df15_25.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
+df11_21 = df11_21.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
+df12_22 = df12_22.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
+df13_23 = df13_23.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
+df14_24 = df14_24.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
+df15_25 = df15_25.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
 
-df11_26 = df11_26.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
-df12_27 = df12_27.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
-df13_28 = df13_28.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
-df14_29 = df14_29.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
-df15_30 = df15_30.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
+df11_26 = df11_26.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
+df12_27 = df12_27.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
+df13_28 = df13_28.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
+df14_29 = df14_29.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
+df15_30 = df15_30.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
 
-df11_31 = df11_31.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
-df12_32 = df12_32.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
-df13_33 = df13_33.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
-df14_34 = df14_34.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
-df15_35 = df15_35.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
+df11_31 = df11_31.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
+df12_32 = df12_32.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
+df13_33 = df13_33.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
+df14_34 = df14_34.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
+df15_35 = df15_35.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
 
-df11_36 = df11_36.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
-df12_37 = df12_37.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
-df13_38 = df13_38.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
-df14_39 = df14_39.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
-df15_40 = df15_40.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
+df11_36 = df11_36.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
+df12_37 = df12_37.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
+df13_38 = df13_38.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
+df14_39 = df14_39.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
+df15_40 = df15_40.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
 
-df11_41 = df11_41.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
-df12_42 = df12_42.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
-df13_43 = df13_43.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
-df14_44 = df14_44.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
-df15_45 = df15_45.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
+df11_41 = df11_41.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
+df12_42 = df12_42.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
+df13_43 = df13_43.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
+df14_44 = df14_44.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
+df15_45 = df15_45.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
 
-df11_46 = df11_46.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
-df12_47 = df12_47.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
-df13_48 = df13_48.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='BARRETT_RATES')
-df14_49 = df14_49.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
-df15_50 = df15_50.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='BARRETT_RATES')
+df11_46 = df11_46.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
+df12_47 = df12_47.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
+df13_48 = df13_48.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_LB')).reset_index(name='Company_RATES')
+df14_49 = df14_49.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
+df15_50 = df15_50.set_index('Zones').unstack().rename_axis(('ZONE','WEIGHT_OZ')).reset_index(name='Company_RATES')
 
 # Make sure the dataframes have both weight in lb and oz columns
 df1['WEIGHT_OZ'] = df1['WEIGHT_LB']*16
@@ -405,17 +371,6 @@ df18['SERVICE_PLAINTEXT']='MI Parcel Select Lightweight Expedited'
 df19['SERVICE_PLAINTEXT']='MI Parcel Select Heavyweight'
 
 # Load DHL rate card
-# 5114358_dhl_sm_parcel_Franklin
-# 5122444_dhl_sm_parcel_Somerset, no DHLEM
-# 5122723_dhl_sm_parcel_8150 Nail Olive Branch
-# 5122739_dhl_sm_parcel_Nail rd Olive branch
-# 5122855_dhl_sm_parcel_Garland TX
-# 5122890_dhl_sm_parcel_Oofos
-# 5122893_dhl_sm_parcell Memphis
-# 5123280_dhl_sm_parcel_MAN
-# 5123282_dhl_sm_parcel Bridgewater
-# 5123283_dhl_sm_parcel_Curtis Bay
-
 df11_1['SERVICE_PLAINTEXT']='DHL SmartMail Parcel Plus Ground 1-25 5114358'
 df12_2['SERVICE_PLAINTEXT']='DHL SmartMail Parcel Ground < 1lb 5114358'
 df13_3['SERVICE_PLAINTEXT']='DHL SmartMail Parcel Plus Expedited 1-25 5114358'
@@ -566,71 +521,71 @@ df8 = df8.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_
 df9 = df9.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'PUBLISHED_RATES'])
 df10 = df10.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'PUBLISHED_RATES'])
 
-df16 = df16.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df17 = df17.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
+df16 = df16.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df17 = df17.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
 
-df18 = df18.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df19 = df19.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
+df18 = df18.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df19 = df19.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
 
-df11_1 = df11_1.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df12_2 = df12_2.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df13_3 = df13_3.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df14_4 = df14_4.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df15_5 = df15_5.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
+df11_1 = df11_1.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df12_2 = df12_2.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df13_3 = df13_3.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df14_4 = df14_4.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df15_5 = df15_5.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
 
-df11_6 = df11_6.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df12_7 = df12_7.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df13_8 = df13_8.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df14_9 = df14_9.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-# df15_10 = df15_10.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
+df11_6 = df11_6.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df12_7 = df12_7.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df13_8 = df13_8.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df14_9 = df14_9.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+# df15_10 = df15_10.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
 
-df11_11 = df11_11.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df12_12 = df12_12.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df13_13 = df13_13.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df14_14 = df14_14.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df15_15 = df15_15.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
+df11_11 = df11_11.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df12_12 = df12_12.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df13_13 = df13_13.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df14_14 = df14_14.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df15_15 = df15_15.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
 
-df11_16 = df11_16.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df12_17 = df12_17.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df13_18 = df13_18.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df14_19 = df14_19.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df15_20 = df15_20.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
+df11_16 = df11_16.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df12_17 = df12_17.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df13_18 = df13_18.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df14_19 = df14_19.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df15_20 = df15_20.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
 
-df11_21 = df11_21.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df12_22 = df12_22.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df13_23 = df13_23.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df14_24 = df14_24.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df15_25 = df15_25.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
+df11_21 = df11_21.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df12_22 = df12_22.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df13_23 = df13_23.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df14_24 = df14_24.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df15_25 = df15_25.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
 
-df11_26 = df11_26.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df12_27 = df12_27.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df13_28 = df13_28.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df14_29 = df14_29.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df15_30 = df15_30.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
+df11_26 = df11_26.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df12_27 = df12_27.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df13_28 = df13_28.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df14_29 = df14_29.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df15_30 = df15_30.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
 
-df11_31 = df11_31.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df12_32 = df12_32.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df13_33 = df13_33.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df14_34 = df14_34.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df15_35 = df15_35.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
+df11_31 = df11_31.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df12_32 = df12_32.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df13_33 = df13_33.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df14_34 = df14_34.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df15_35 = df15_35.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
 
-df11_36 = df11_36.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df12_37 = df12_37.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df13_38 = df13_38.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df14_39 = df14_39.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df15_40 = df15_40.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
+df11_36 = df11_36.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df12_37 = df12_37.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df13_38 = df13_38.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df14_39 = df14_39.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df15_40 = df15_40.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
 
-df11_41 = df11_41.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df12_42 = df12_42.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df13_43 = df13_43.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df14_44 = df14_44.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df15_45 = df15_45.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
+df11_41 = df11_41.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df12_42 = df12_42.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df13_43 = df13_43.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df14_44 = df14_44.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df15_45 = df15_45.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
 
-df11_46 = df11_46.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df12_47 = df12_47.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df13_48 = df13_48.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df14_49 = df14_49.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
-df15_50 = df15_50.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'BARRETT_RATES'])
+df11_46 = df11_46.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df12_47 = df12_47.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df13_48 = df13_48.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df14_49 = df14_49.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
+df15_50 = df15_50.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'Company_RATES'])
 
 tbl_publishedRates = pd.concat([df1, df2, df3, df4, df5, df6, df7, df8, df9, df10, df16, df17, df18, df19,
                                df11_1, df12_2, df13_3, df14_4, df15_5, df11_6, df12_7, df13_8, df14_9, 
@@ -690,10 +645,10 @@ tbl_publishedRates.reset_index(drop=True, inplace=True)
 # tbl_publishedRates.head()
 # tbl_publishedRates.to_csv('test.csv')
 
-# Step 1 - b. Create Freight Rate Card (tbl_BarrettRates)
-*Add ups BarrettRates to tbl_publishedRates
+# Step 1 - b. Create Freight Rate Card (tbl_CompanyRates)
+*Add ups CompanyRates to tbl_publishedRates
 
-#The result is BarrettRate when margin = 0.
+#The result is CompanyRate when margin = 0.
 #For UPS client freight & accessorial discounts, write "YES"/"NO" for rounding/not rounding to 2 decimal places.
 Round_Discount_BR = "YES"
 
@@ -707,7 +662,7 @@ Margin_on_UPS_Parcel_Freight_AIR_BR = 0
 Margin_on_Value_Add_GRND_BR = 0
 Margin_on_Value_Add_AIR_BR = 0
 
-# UPSAccessorial_2023 has 2 tabs, UPS_Rates and UPS_Accessorial. UPS_Rates is used to create Barrett Rates
+# UPSAccessorial_2023 has 2 tabs, UPS_Rates and UPS_Accessorial. UPS_Rates is used to create Company Rates
 xls = pd.ExcelFile('UPSAccessorial_2023.xlsx')
 UPS_Rates = pd.read_excel(xls, 'UPS_Rates')
 
@@ -833,7 +788,7 @@ UPS_Rates['DISCOUNT_TO_CLIENT(1-COLN)'] = UPS_Rates.apply(j, axis=1)
 
 #GRND ['WEIGHT_BREAK'] == '1-5lb'
 # slice the published rates
-tbl_barrettRates_1 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'GRND') & (tbl_publishedRates['WEIGHT_LB'] <= 5)]
+tbl_CompanyRates_1 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'GRND') & (tbl_publishedRates['WEIGHT_LB'] <= 5)]
 
 # get DISCOUNT_TO_CLIENT(1-COLN) and CLIENT_MARGIN_MINS
 DISCOUNT_TO_CLIENT_1 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'GRND') & (UPS_Rates['WEIGHT_BREAK'] == '1-5lb'), 'DISCOUNT_TO_CLIENT(1-COLN)'].values[0]
@@ -844,259 +799,259 @@ else:
 CLIENT_MARGIN_MINS_1 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'GRND') & (UPS_Rates['WEIGHT_BREAK'] == '1-5lb'), 'CLIENT_MARGIN_MINS'].values[0]
 
 # use max(published rates * (1-round(DISCOUNT_TO_CLIENT)), CLIENT_MARGIN_MINS) to get the client rate
-tbl_barrettRates_1['BARRETT_RATES_1'] = tbl_barrettRates_1['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_1)
-tbl_barrettRates_1['BARRETT_RATES'] = round(tbl_barrettRates_1['BARRETT_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_1)),2)
-tbl_barrettRates_1 = tbl_barrettRates_1.drop('BARRETT_RATES_1', axis=1)
+tbl_CompanyRates_1['Company_RATES_1'] = tbl_CompanyRates_1['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_1)
+tbl_CompanyRates_1['Company_RATES'] = round(tbl_CompanyRates_1['Company_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_1)),2)
+tbl_CompanyRates_1 = tbl_CompanyRates_1.drop('Company_RATES_1', axis=1)
 
 
 #GRND ['WEIGHT_BREAK'] == '6-10lb'
-tbl_barrettRates_2 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'GRND') & (tbl_publishedRates['WEIGHT_LB'] <= 10) & (tbl_publishedRates['WEIGHT_LB'] >= 6)]
+tbl_CompanyRates_2 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'GRND') & (tbl_publishedRates['WEIGHT_LB'] <= 10) & (tbl_publishedRates['WEIGHT_LB'] >= 6)]
 DISCOUNT_TO_CLIENT_2 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'GRND') & (UPS_Rates['WEIGHT_BREAK'] == '6-10lb'), 'DISCOUNT_TO_CLIENT(1-COLN)'].values[0]
 if Round_Discount == 'YES':
     DISCOUNT_TO_CLIENT_2 = round(DISCOUNT_TO_CLIENT_2,2)
 else:
     DISCOUNT_TO_CLIENT_2 = DISCOUNT_TO_CLIENT_2
 CLIENT_MARGIN_MINS_2 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'GRND') & (UPS_Rates['WEIGHT_BREAK'] == '6-10lb'), 'CLIENT_MARGIN_MINS'].values[0]
-tbl_barrettRates_2['BARRETT_RATES_1'] = tbl_barrettRates_2['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_2)
-tbl_barrettRates_2['BARRETT_RATES'] = round(tbl_barrettRates_2['BARRETT_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_2)),2)
-tbl_barrettRates_2 = tbl_barrettRates_2.drop('BARRETT_RATES_1', axis=1)
+tbl_CompanyRates_2['Company_RATES_1'] = tbl_CompanyRates_2['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_2)
+tbl_CompanyRates_2['Company_RATES'] = round(tbl_CompanyRates_2['Company_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_2)),2)
+tbl_CompanyRates_2 = tbl_CompanyRates_2.drop('Company_RATES_1', axis=1)
 
 
 #GRND ['WEIGHT_BREAK'] == '11-20lb'
-tbl_barrettRates_3 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'GRND') & (tbl_publishedRates['WEIGHT_LB'] <= 20) & (tbl_publishedRates['WEIGHT_LB'] >= 11)]
+tbl_CompanyRates_3 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'GRND') & (tbl_publishedRates['WEIGHT_LB'] <= 20) & (tbl_publishedRates['WEIGHT_LB'] >= 11)]
 DISCOUNT_TO_CLIENT_3 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'GRND') & (UPS_Rates['WEIGHT_BREAK'] == '11-20lb'), 'DISCOUNT_TO_CLIENT(1-COLN)'].values[0]
 if Round_Discount == 'YES':
     DISCOUNT_TO_CLIENT_3 = round(DISCOUNT_TO_CLIENT_3,2)
 else:
     DISCOUNT_TO_CLIENT_3 = DISCOUNT_TO_CLIENT_3
 CLIENT_MARGIN_MINS_3 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'GRND') & (UPS_Rates['WEIGHT_BREAK'] == '11-20lb'), 'CLIENT_MARGIN_MINS'].values[0]
-tbl_barrettRates_3['BARRETT_RATES_1'] = tbl_barrettRates_3['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_3)
-tbl_barrettRates_3['BARRETT_RATES'] = round(tbl_barrettRates_3['BARRETT_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_3)),2)
-tbl_barrettRates_3 = tbl_barrettRates_3.drop('BARRETT_RATES_1', axis=1)
+tbl_CompanyRates_3['Company_RATES_1'] = tbl_CompanyRates_3['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_3)
+tbl_CompanyRates_3['Company_RATES'] = round(tbl_CompanyRates_3['Company_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_3)),2)
+tbl_CompanyRates_3 = tbl_CompanyRates_3.drop('Company_RATES_1', axis=1)
 
 
 #GRND ['WEIGHT_BREAK'] == '21-30lb'
-tbl_barrettRates_4 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'GRND') & (tbl_publishedRates['WEIGHT_LB'] <= 30) & (tbl_publishedRates['WEIGHT_LB'] >= 21)]
+tbl_CompanyRates_4 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'GRND') & (tbl_publishedRates['WEIGHT_LB'] <= 30) & (tbl_publishedRates['WEIGHT_LB'] >= 21)]
 DISCOUNT_TO_CLIENT_4 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'GRND') & (UPS_Rates['WEIGHT_BREAK'] == '21-30lb'), 'DISCOUNT_TO_CLIENT(1-COLN)'].values[0]
 if Round_Discount == 'YES':
     DISCOUNT_TO_CLIENT_4 = round(DISCOUNT_TO_CLIENT_4,2)
 else:
     DISCOUNT_TO_CLIENT_4 = DISCOUNT_TO_CLIENT_4
 CLIENT_MARGIN_MINS_4 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'GRND') & (UPS_Rates['WEIGHT_BREAK'] == '21-30lb'), 'CLIENT_MARGIN_MINS'].values[0]
-tbl_barrettRates_4['BARRETT_RATES_1'] = tbl_barrettRates_4['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_4)
-tbl_barrettRates_4['BARRETT_RATES'] = round(tbl_barrettRates_4['BARRETT_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_4)),2)
-tbl_barrettRates_4 = tbl_barrettRates_4.drop('BARRETT_RATES_1', axis=1)
+tbl_CompanyRates_4['Company_RATES_1'] = tbl_CompanyRates_4['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_4)
+tbl_CompanyRates_4['Company_RATES'] = round(tbl_CompanyRates_4['Company_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_4)),2)
+tbl_CompanyRates_4 = tbl_CompanyRates_4.drop('Company_RATES_1', axis=1)
 
 
 #GRND ['WEIGHT_BREAK'] == '31+lb'
-tbl_barrettRates_5 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'GRND') & (tbl_publishedRates['WEIGHT_LB'] >= 31)]
+tbl_CompanyRates_5 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'GRND') & (tbl_publishedRates['WEIGHT_LB'] >= 31)]
 DISCOUNT_TO_CLIENT_5 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'GRND') & (UPS_Rates['WEIGHT_BREAK'] == '31+lb'), 'DISCOUNT_TO_CLIENT(1-COLN)'].values[0]
 if Round_Discount == 'YES':
     DISCOUNT_TO_CLIENT_5 = round(DISCOUNT_TO_CLIENT_5,2)
 else:
     DISCOUNT_TO_CLIENT_5 = DISCOUNT_TO_CLIENT_5
 CLIENT_MARGIN_MINS_5 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'GRND') & (UPS_Rates['WEIGHT_BREAK'] == '31+lb'), 'CLIENT_MARGIN_MINS'].values[0]
-tbl_barrettRates_5['BARRETT_RATES_1'] = tbl_barrettRates_5['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_5)
-tbl_barrettRates_5['BARRETT_RATES'] = round(tbl_barrettRates_5['BARRETT_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_5)),2)
-tbl_barrettRates_5 = tbl_barrettRates_5.drop('BARRETT_RATES_1', axis=1)
+tbl_CompanyRates_5['Company_RATES_1'] = tbl_CompanyRates_5['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_5)
+tbl_CompanyRates_5['Company_RATES'] = round(tbl_CompanyRates_5['Company_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_5)),2)
+tbl_CompanyRates_5 = tbl_CompanyRates_5.drop('Company_RATES_1', axis=1)
 
 
 #GRES 
 #GRES ['WEIGHT_BREAK'] == '1-5lb'
-tbl_barrettRates_6 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'GRES') & (tbl_publishedRates['WEIGHT_LB'] <= 5)]
+tbl_CompanyRates_6 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'GRES') & (tbl_publishedRates['WEIGHT_LB'] <= 5)]
 DISCOUNT_TO_CLIENT_6 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'GRES') & (UPS_Rates['WEIGHT_BREAK'] == '1-5lb'), 'DISCOUNT_TO_CLIENT(1-COLN)'].values[0]
 if Round_Discount == 'YES':
     DISCOUNT_TO_CLIENT_6 = round(DISCOUNT_TO_CLIENT_6,2)
 else:
     DISCOUNT_TO_CLIENT_6 = DISCOUNT_TO_CLIENT_6
 CLIENT_MARGIN_MINS_6 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'GRES') & (UPS_Rates['WEIGHT_BREAK'] == '1-5lb'), 'CLIENT_MARGIN_MINS'].values[0]
-tbl_barrettRates_6['BARRETT_RATES_1'] = tbl_barrettRates_6['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_6)
-tbl_barrettRates_6['BARRETT_RATES'] = round(tbl_barrettRates_6['BARRETT_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_6)),2)
-tbl_barrettRates_6 = tbl_barrettRates_6.drop('BARRETT_RATES_1', axis=1)
+tbl_CompanyRates_6['Company_RATES_1'] = tbl_CompanyRates_6['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_6)
+tbl_CompanyRates_6['Company_RATES'] = round(tbl_CompanyRates_6['Company_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_6)),2)
+tbl_CompanyRates_6 = tbl_CompanyRates_6.drop('Company_RATES_1', axis=1)
 
 
 #GRES ['WEIGHT_BREAK'] == '6-10lb'
-tbl_barrettRates_7 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'GRES') & (tbl_publishedRates['WEIGHT_LB'] <= 10) & (tbl_publishedRates['WEIGHT_LB'] >= 6)]
+tbl_CompanyRates_7 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'GRES') & (tbl_publishedRates['WEIGHT_LB'] <= 10) & (tbl_publishedRates['WEIGHT_LB'] >= 6)]
 DISCOUNT_TO_CLIENT_7 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'GRES') & (UPS_Rates['WEIGHT_BREAK'] == '6-10lb'), 'DISCOUNT_TO_CLIENT(1-COLN)'].values[0]
 if Round_Discount == 'YES':
     DISCOUNT_TO_CLIENT_7 = round(DISCOUNT_TO_CLIENT_7,2)
 else:
     DISCOUNT_TO_CLIENT_7 = DISCOUNT_TO_CLIENT_7
 CLIENT_MARGIN_MINS_7 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'GRES') & (UPS_Rates['WEIGHT_BREAK'] == '6-10lb'), 'CLIENT_MARGIN_MINS'].values[0]
-tbl_barrettRates_7['BARRETT_RATES_1'] = tbl_barrettRates_7['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_7)
-tbl_barrettRates_7['BARRETT_RATES'] = round(tbl_barrettRates_7['BARRETT_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_7)),2)
-tbl_barrettRates_7 = tbl_barrettRates_7.drop('BARRETT_RATES_1', axis=1)
+tbl_CompanyRates_7['Company_RATES_1'] = tbl_CompanyRates_7['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_7)
+tbl_CompanyRates_7['Company_RATES'] = round(tbl_CompanyRates_7['Company_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_7)),2)
+tbl_CompanyRates_7 = tbl_CompanyRates_7.drop('Company_RATES_1', axis=1)
 
 
 #GRES ['WEIGHT_BREAK'] == '11-20lb'
-tbl_barrettRates_8 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'GRES') & (tbl_publishedRates['WEIGHT_LB'] <= 20) & (tbl_publishedRates['WEIGHT_LB'] >= 11)]
+tbl_CompanyRates_8 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'GRES') & (tbl_publishedRates['WEIGHT_LB'] <= 20) & (tbl_publishedRates['WEIGHT_LB'] >= 11)]
 DISCOUNT_TO_CLIENT_8 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'GRES') & (UPS_Rates['WEIGHT_BREAK'] == '11-20lb'), 'DISCOUNT_TO_CLIENT(1-COLN)'].values[0]
 if Round_Discount == 'YES':
     DISCOUNT_TO_CLIENT_8 = round(DISCOUNT_TO_CLIENT_8,2)
 else:
     DISCOUNT_TO_CLIENT_8 = DISCOUNT_TO_CLIENT_8
 CLIENT_MARGIN_MINS_8 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'GRES') & (UPS_Rates['WEIGHT_BREAK'] == '11-20lb'), 'CLIENT_MARGIN_MINS'].values[0]
-tbl_barrettRates_8['BARRETT_RATES_1'] = tbl_barrettRates_8['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_8)
-tbl_barrettRates_8['BARRETT_RATES'] = round(tbl_barrettRates_8['BARRETT_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_8)),2)
-tbl_barrettRates_8 = tbl_barrettRates_8.drop('BARRETT_RATES_1', axis=1)
+tbl_CompanyRates_8['Company_RATES_1'] = tbl_CompanyRates_8['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_8)
+tbl_CompanyRates_8['Company_RATES'] = round(tbl_CompanyRates_8['Company_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_8)),2)
+tbl_CompanyRates_8 = tbl_CompanyRates_8.drop('Company_RATES_1', axis=1)
 
 
 #GRES ['WEIGHT_BREAK'] == '21-30lb'
-tbl_barrettRates_9 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'GRES') & (tbl_publishedRates['WEIGHT_LB'] <= 30) & (tbl_publishedRates['WEIGHT_LB'] >= 21)]
+tbl_CompanyRates_9 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'GRES') & (tbl_publishedRates['WEIGHT_LB'] <= 30) & (tbl_publishedRates['WEIGHT_LB'] >= 21)]
 DISCOUNT_TO_CLIENT_9 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'GRES') & (UPS_Rates['WEIGHT_BREAK'] == '21-30lb'), 'DISCOUNT_TO_CLIENT(1-COLN)'].values[0]
 if Round_Discount == 'YES':
     DISCOUNT_TO_CLIENT_9 = round(DISCOUNT_TO_CLIENT_9,2)
 else:
     DISCOUNT_TO_CLIENT_9 = DISCOUNT_TO_CLIENT_9
 CLIENT_MARGIN_MINS_9 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'GRES') & (UPS_Rates['WEIGHT_BREAK'] == '21-30lb'), 'CLIENT_MARGIN_MINS'].values[0]
-tbl_barrettRates_9['BARRETT_RATES_1'] = tbl_barrettRates_9['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_9)
-tbl_barrettRates_9['BARRETT_RATES'] = round(tbl_barrettRates_9['BARRETT_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_9)),2)
-tbl_barrettRates_9 = tbl_barrettRates_9.drop('BARRETT_RATES_1', axis=1)
+tbl_CompanyRates_9['Company_RATES_1'] = tbl_CompanyRates_9['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_9)
+tbl_CompanyRates_9['Company_RATES'] = round(tbl_CompanyRates_9['Company_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_9)),2)
+tbl_CompanyRates_9 = tbl_CompanyRates_9.drop('Company_RATES_1', axis=1)
 
 
 #GRES ['WEIGHT_BREAK'] == '31+lb'
-tbl_barrettRates_10 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'GRES') & (tbl_publishedRates['WEIGHT_LB'] >= 31)]
+tbl_CompanyRates_10 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'GRES') & (tbl_publishedRates['WEIGHT_LB'] >= 31)]
 DISCOUNT_TO_CLIENT_10 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'GRES') & (UPS_Rates['WEIGHT_BREAK'] == '31+lb'), 'DISCOUNT_TO_CLIENT(1-COLN)'].values[0]
 if Round_Discount == 'YES':
     DISCOUNT_TO_CLIENT_10 = round(DISCOUNT_TO_CLIENT_10,2)
 else:
     DISCOUNT_TO_CLIENT_10 = DISCOUNT_TO_CLIENT_10
 CLIENT_MARGIN_MINS_10 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'GRES') & (UPS_Rates['WEIGHT_BREAK'] == '31+lb'), 'CLIENT_MARGIN_MINS'].values[0]
-tbl_barrettRates_10['BARRETT_RATES_1'] = tbl_barrettRates_10['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_10)
-tbl_barrettRates_10['BARRETT_RATES'] = round(tbl_barrettRates_10['BARRETT_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_10)),2)
-tbl_barrettRates_10 = tbl_barrettRates_10.drop('BARRETT_RATES_1', axis=1)
+tbl_CompanyRates_10['Company_RATES_1'] = tbl_CompanyRates_10['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_10)
+tbl_CompanyRates_10['Company_RATES'] = round(tbl_CompanyRates_10['Company_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_10)),2)
+tbl_CompanyRates_10 = tbl_CompanyRates_10.drop('Company_RATES_1', axis=1)
 
 
 #SRPT
 #SRPT ['WEIGHT_BREAK'] == '1-3lb'
-tbl_barrettRates_11 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'SRPT') & (tbl_publishedRates['WEIGHT_LB'] <= 3)]
+tbl_CompanyRates_11 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'SRPT') & (tbl_publishedRates['WEIGHT_LB'] <= 3)]
 DISCOUNT_TO_CLIENT_11 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'SRPT') & (UPS_Rates['WEIGHT_BREAK'] == '1-3lb'), 'DISCOUNT_TO_CLIENT(1-COLN)'].values[0]
 if Round_Discount == 'YES':
     DISCOUNT_TO_CLIENT_11 = round(DISCOUNT_TO_CLIENT_11,2)
 else:
     DISCOUNT_TO_CLIENT_11 = DISCOUNT_TO_CLIENT_11
 CLIENT_MARGIN_MINS_11 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'SRPT') & (UPS_Rates['WEIGHT_BREAK'] == '1-3lb'), 'CLIENT_MARGIN_MINS'].values[0]
-tbl_barrettRates_11['BARRETT_RATES_1'] = tbl_barrettRates_11['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_11)
-tbl_barrettRates_11['BARRETT_RATES'] = round(tbl_barrettRates_11['BARRETT_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_11)),2)
-tbl_barrettRates_11 = tbl_barrettRates_11.drop('BARRETT_RATES_1', axis=1)
+tbl_CompanyRates_11['Company_RATES_1'] = tbl_CompanyRates_11['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_11)
+tbl_CompanyRates_11['Company_RATES'] = round(tbl_CompanyRates_11['Company_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_11)),2)
+tbl_CompanyRates_11 = tbl_CompanyRates_11.drop('Company_RATES_1', axis=1)
 
 
 #SRPT ['WEIGHT_BREAK'] == '4-6lb'
-tbl_barrettRates_12 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'SRPT') & (tbl_publishedRates['WEIGHT_LB'] >= 4) & (tbl_publishedRates['WEIGHT_LB'] <= 6)]
+tbl_CompanyRates_12 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'SRPT') & (tbl_publishedRates['WEIGHT_LB'] >= 4) & (tbl_publishedRates['WEIGHT_LB'] <= 6)]
 DISCOUNT_TO_CLIENT_12 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'SRPT') & (UPS_Rates['WEIGHT_BREAK'] == '4-6lb'), 'DISCOUNT_TO_CLIENT(1-COLN)'].values[0]
 if Round_Discount == 'YES':
     DISCOUNT_TO_CLIENT_12 = round(DISCOUNT_TO_CLIENT_12,2)
 else:
     DISCOUNT_TO_CLIENT_12 = DISCOUNT_TO_CLIENT_12
 CLIENT_MARGIN_MINS_12 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'SRPT') & (UPS_Rates['WEIGHT_BREAK'] == '4-6lb'), 'CLIENT_MARGIN_MINS'].values[0]
-tbl_barrettRates_12['BARRETT_RATES_1'] = tbl_barrettRates_12['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_12)
-tbl_barrettRates_12['BARRETT_RATES'] = round(tbl_barrettRates_12['BARRETT_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_12)),2)
-tbl_barrettRates_12 = tbl_barrettRates_12.drop('BARRETT_RATES_1', axis=1)
+tbl_CompanyRates_12['Company_RATES_1'] = tbl_CompanyRates_12['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_12)
+tbl_CompanyRates_12['Company_RATES'] = round(tbl_CompanyRates_12['Company_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_12)),2)
+tbl_CompanyRates_12 = tbl_CompanyRates_12.drop('Company_RATES_1', axis=1)
 
 
 #SRPT ['WEIGHT_BREAK'] == '7-8lb'
-tbl_barrettRates_13 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'SRPT') & (tbl_publishedRates['WEIGHT_LB'] >= 7) & (tbl_publishedRates['WEIGHT_LB'] <= 8)]
+tbl_CompanyRates_13 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'SRPT') & (tbl_publishedRates['WEIGHT_LB'] >= 7) & (tbl_publishedRates['WEIGHT_LB'] <= 8)]
 DISCOUNT_TO_CLIENT_13 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'SRPT') & (UPS_Rates['WEIGHT_BREAK'] == '7-8lb'), 'DISCOUNT_TO_CLIENT(1-COLN)'].values[0]
 if Round_Discount == 'YES':
     DISCOUNT_TO_CLIENT_13 = round(DISCOUNT_TO_CLIENT_13,2)
 else:
     DISCOUNT_TO_CLIENT_13 = DISCOUNT_TO_CLIENT_13
 CLIENT_MARGIN_MINS_13 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'SRPT') & (UPS_Rates['WEIGHT_BREAK'] == '7-8lb'), 'CLIENT_MARGIN_MINS'].values[0]
-tbl_barrettRates_13['BARRETT_RATES_1'] = tbl_barrettRates_13['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_13)
-tbl_barrettRates_13['BARRETT_RATES'] = round(tbl_barrettRates_13['BARRETT_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_13)),2)
-tbl_barrettRates_13 = tbl_barrettRates_13.drop('BARRETT_RATES_1', axis=1)
+tbl_CompanyRates_13['Company_RATES_1'] = tbl_CompanyRates_13['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_13)
+tbl_CompanyRates_13['Company_RATES'] = round(tbl_CompanyRates_13['Company_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_13)),2)
+tbl_CompanyRates_13 = tbl_CompanyRates_13.drop('Company_RATES_1', axis=1)
 
 
 #SRPT ['WEIGHT_BREAK'] == '9lb'
-tbl_barrettRates_14 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'SRPT') & (tbl_publishedRates['WEIGHT_LB'] == 9)]
+tbl_CompanyRates_14 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'SRPT') & (tbl_publishedRates['WEIGHT_LB'] == 9)]
 DISCOUNT_TO_CLIENT_14 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'SRPT') & (UPS_Rates['WEIGHT_BREAK'] == '9lb'), 'DISCOUNT_TO_CLIENT(1-COLN)'].values[0]
 if Round_Discount == 'YES':
     DISCOUNT_TO_CLIENT_14 = round(DISCOUNT_TO_CLIENT_14,2)
 else:
     DISCOUNT_TO_CLIENT_14 = DISCOUNT_TO_CLIENT_14
 CLIENT_MARGIN_MINS_14 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'SRPT') & (UPS_Rates['WEIGHT_BREAK'] == '9lb'), 'CLIENT_MARGIN_MINS'].values[0]
-tbl_barrettRates_14['BARRETT_RATES_1'] = tbl_barrettRates_14['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_14)
-tbl_barrettRates_14['BARRETT_RATES'] = round(tbl_barrettRates_14['BARRETT_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_14)),2)
-tbl_barrettRates_14 = tbl_barrettRates_14.drop('BARRETT_RATES_1', axis=1)
+tbl_CompanyRates_14['Company_RATES_1'] = tbl_CompanyRates_14['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_14)
+tbl_CompanyRates_14['Company_RATES'] = round(tbl_CompanyRates_14['Company_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_14)),2)
+tbl_CompanyRates_14 = tbl_CompanyRates_14.drop('Company_RATES_1', axis=1)
 
 
 #Others:
 #UPS REDE, there is no discount, therefore REDE's client rate = published rate
-tbl_barrettRates_15 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'REDE')]
-tbl_barrettRates_15['BARRETT_RATES'] = tbl_barrettRates_15['PUBLISHED_RATES']
+tbl_CompanyRates_15 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'REDE')]
+tbl_CompanyRates_15['Company_RATES'] = tbl_CompanyRates_15['PUBLISHED_RATES']
 
 
 #UPS RED
-tbl_barrettRates_16 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'RED')]
+tbl_CompanyRates_16 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'RED')]
 DISCOUNT_TO_CLIENT_16 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'RED'), 'DISCOUNT_TO_CLIENT(1-COLN)'].values[0]
 if Round_Discount == 'YES':
     DISCOUNT_TO_CLIENT_16 = round(DISCOUNT_TO_CLIENT_16,2)
 else:
     DISCOUNT_TO_CLIENT_16 = DISCOUNT_TO_CLIENT_16
 CLIENT_MARGIN_MINS_16 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'RED'), 'CLIENT_MARGIN_MINS'].values[0]
-tbl_barrettRates_16['BARRETT_RATES_1'] = tbl_barrettRates_16['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_16)
-tbl_barrettRates_16['BARRETT_RATES'] = round(tbl_barrettRates_16['BARRETT_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_16)),2)
-tbl_barrettRates_16 = tbl_barrettRates_16.drop('BARRETT_RATES_1', axis=1)
+tbl_CompanyRates_16['Company_RATES_1'] = tbl_CompanyRates_16['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_16)
+tbl_CompanyRates_16['Company_RATES'] = round(tbl_CompanyRates_16['Company_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_16)),2)
+tbl_CompanyRates_16 = tbl_CompanyRates_16.drop('Company_RATES_1', axis=1)
 
 
 #UPS REDS, this does not have round up option (1/2)
-tbl_barrettRates_17 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'REDS')]
+tbl_CompanyRates_17 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'REDS')]
 DISCOUNT_TO_CLIENT_17 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'REDS'), 'DISCOUNT_TO_CLIENT(1-COLN)'].values[0]
 CLIENT_MARGIN_MINS_17 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'REDS'), 'CLIENT_MARGIN_MINS'].values[0]
-tbl_barrettRates_17['BARRETT_RATES_1'] = tbl_barrettRates_17['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_17)
-tbl_barrettRates_17['BARRETT_RATES'] = round(tbl_barrettRates_17['BARRETT_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_17)),2)
-tbl_barrettRates_17 = tbl_barrettRates_17.drop('BARRETT_RATES_1', axis=1)
+tbl_CompanyRates_17['Company_RATES_1'] = tbl_CompanyRates_17['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_17)
+tbl_CompanyRates_17['Company_RATES'] = round(tbl_CompanyRates_17['Company_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_17)),2)
+tbl_CompanyRates_17 = tbl_CompanyRates_17.drop('Company_RATES_1', axis=1)
 
 
 #UPS 2DAM, this does not have round up option (2/2)
-tbl_barrettRates_18 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == '2DAM')]
+tbl_CompanyRates_18 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == '2DAM')]
 DISCOUNT_TO_CLIENT_18 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == '2DAM'), 'DISCOUNT_TO_CLIENT(1-COLN)'].values[0]
 CLIENT_MARGIN_MINS_18 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == '2DAM'), 'CLIENT_MARGIN_MINS'].values[0]
-tbl_barrettRates_18['BARRETT_RATES_1'] = tbl_barrettRates_18['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_18)
-tbl_barrettRates_18['BARRETT_RATES'] = round(tbl_barrettRates_18['BARRETT_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_18)),2)
-tbl_barrettRates_18 = tbl_barrettRates_18.drop('BARRETT_RATES_1', axis=1)
+tbl_CompanyRates_18['Company_RATES_1'] = tbl_CompanyRates_18['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_18)
+tbl_CompanyRates_18['Company_RATES'] = round(tbl_CompanyRates_18['Company_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_18)),2)
+tbl_CompanyRates_18 = tbl_CompanyRates_18.drop('Company_RATES_1', axis=1)
 
 
 #UPS BLUE
-tbl_barrettRates_19 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'BLUE')]
+tbl_CompanyRates_19 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'BLUE')]
 DISCOUNT_TO_CLIENT_19 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'BLUE'), 'DISCOUNT_TO_CLIENT(1-COLN)'].values[0]
 if Round_Discount == 'YES':
     DISCOUNT_TO_CLIENT_19 = round(DISCOUNT_TO_CLIENT_19,2)
 else:
     DISCOUNT_TO_CLIENT_19 = DISCOUNT_TO_CLIENT_19
 CLIENT_MARGIN_MINS_19 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'BLUE') , 'CLIENT_MARGIN_MINS'].values[0]
-tbl_barrettRates_19['BARRETT_RATES_1'] = tbl_barrettRates_19['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_19)
-tbl_barrettRates_19['BARRETT_RATES'] = round(tbl_barrettRates_19['BARRETT_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_19)),2)
-tbl_barrettRates_19 = tbl_barrettRates_19.drop('BARRETT_RATES_1', axis=1)
+tbl_CompanyRates_19['Company_RATES_1'] = tbl_CompanyRates_19['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_19)
+tbl_CompanyRates_19['Company_RATES'] = round(tbl_CompanyRates_19['Company_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_19)),2)
+tbl_CompanyRates_19 = tbl_CompanyRates_19.drop('Company_RATES_1', axis=1)
 
 
 #UPS ORNG
-tbl_barrettRates_20 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'ORNG')]
+tbl_CompanyRates_20 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'ORNG')]
 DISCOUNT_TO_CLIENT_20 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'ORNG'), 'DISCOUNT_TO_CLIENT(1-COLN)'].values[0]
 if Round_Discount == 'YES':
     DISCOUNT_TO_CLIENT_20 = round(DISCOUNT_TO_CLIENT_20,2)
 else:
     DISCOUNT_TO_CLIENT_20 = DISCOUNT_TO_CLIENT_20
 CLIENT_MARGIN_MINS_20 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'ORNG'), 'CLIENT_MARGIN_MINS'].values[0]
-tbl_barrettRates_20['BARRETT_RATES_1'] = tbl_barrettRates_20['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_20)
-tbl_barrettRates_20['BARRETT_RATES'] = round(tbl_barrettRates_20['BARRETT_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_20)),2)
-tbl_barrettRates_20 = tbl_barrettRates_20.drop('BARRETT_RATES_1', axis=1)
+tbl_CompanyRates_20['Company_RATES_1'] = tbl_CompanyRates_20['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_20)
+tbl_CompanyRates_20['Company_RATES'] = round(tbl_CompanyRates_20['Company_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_20)),2)
+tbl_CompanyRates_20 = tbl_CompanyRates_20.drop('Company_RATES_1', axis=1)
 
 
 #UPS SRPT<1
-tbl_barrettRates_21 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'SRPT<1')]
+tbl_CompanyRates_21 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'SRPT<1')]
 DISCOUNT_TO_CLIENT_21 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'SRPT<1'), 'DISCOUNT_TO_CLIENT(1-COLN)'].values[0]
 if Round_Discount == 'YES':
     DISCOUNT_TO_CLIENT_21 = round(DISCOUNT_TO_CLIENT_21,2)
 else:
     DISCOUNT_TO_CLIENT_21 = DISCOUNT_TO_CLIENT_21
 CLIENT_MARGIN_MINS_21 = UPS_Rates.loc[(UPS_Rates['SERVICE_CODE'] == 'SRPT<1'), 'CLIENT_MARGIN_MINS'].values[0]
-tbl_barrettRates_21['BARRETT_RATES_1'] = tbl_barrettRates_21['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_21)
-tbl_barrettRates_21['BARRETT_RATES'] = round(tbl_barrettRates_21['BARRETT_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_21)),2)
-tbl_barrettRates_21 = tbl_barrettRates_21.drop('BARRETT_RATES_1', axis=1)
+tbl_CompanyRates_21['Company_RATES_1'] = tbl_CompanyRates_21['PUBLISHED_RATES']*(1-DISCOUNT_TO_CLIENT_21)
+tbl_CompanyRates_21['Company_RATES'] = round(tbl_CompanyRates_21['Company_RATES_1'].apply(lambda x: max(x, CLIENT_MARGIN_MINS_21)),2)
+tbl_CompanyRates_21 = tbl_CompanyRates_21.drop('Company_RATES_1', axis=1)
 
 #Get dhl, usps, and mi rates
-tbl_barrettRates_22 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'USPSAG') | 
+tbl_CompanyRates_22 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 'USPSAG') | 
                                          (tbl_publishedRates['SERVICE_CODE'] == 'USPSAP') | 
                                          (tbl_publishedRates['SERVICE_CODE'] == 'MIPLE') |
                                          (tbl_publishedRates['SERVICE_CODE'] == 'MIPH') |
@@ -1107,20 +1062,20 @@ tbl_barrettRates_22 = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == 
                                          (tbl_publishedRates['SERVICE_CODE'].str.startswith('DHLEM_'))]
 
 
-#combine them to rename as BarrettRates
-tbl_BarrettRates = pd.concat([tbl_barrettRates_1, tbl_barrettRates_2, tbl_barrettRates_3, tbl_barrettRates_4, 
-                    tbl_barrettRates_5, tbl_barrettRates_6, tbl_barrettRates_7, tbl_barrettRates_8,
-                    tbl_barrettRates_9, tbl_barrettRates_10, tbl_barrettRates_11, tbl_barrettRates_12,
-                    tbl_barrettRates_13, tbl_barrettRates_14, tbl_barrettRates_15, tbl_barrettRates_16,
-                    tbl_barrettRates_17, tbl_barrettRates_18, tbl_barrettRates_19, tbl_barrettRates_20,
-                    tbl_barrettRates_21, tbl_barrettRates_22])
-#Keep this table as it only contains published rates and Barrett rates
-#tbl_BarrettRates.head()
+#combine them to rename as CompanyRates
+tbl_CompanyRates = pd.concat([tbl_CompanyRates_1, tbl_CompanyRates_2, tbl_CompanyRates_3, tbl_CompanyRates_4, 
+                    tbl_CompanyRates_5, tbl_CompanyRates_6, tbl_CompanyRates_7, tbl_CompanyRates_8,
+                    tbl_CompanyRates_9, tbl_CompanyRates_10, tbl_CompanyRates_11, tbl_CompanyRates_12,
+                    tbl_CompanyRates_13, tbl_CompanyRates_14, tbl_CompanyRates_15, tbl_CompanyRates_16,
+                    tbl_CompanyRates_17, tbl_CompanyRates_18, tbl_CompanyRates_19, tbl_CompanyRates_20,
+                    tbl_CompanyRates_21, tbl_CompanyRates_22])
+#Keep this table as it only contains published rates and Company rates
+#tbl_CompanyRates.head()
 
 # Step 1 - c. Create Freight Rate Card (tbl_clientRates)
 *Add ups, dhl, and usps clientRates in tbl_publishedRates. Read the margins located at the top of this model. 
 
-# UPSAccessorial_2023 has 2 tabs, UPS_Rates and UPS_Accessorial. UPS_Rates is used to create Barrett Rates
+# UPSAccessorial_2023 has 2 tabs, UPS_Rates and UPS_Accessorial. UPS_Rates is used to create Company Rates
 xls = pd.ExcelFile('UPSAccessorial_2023.xlsx')
 UPS_Rates = pd.read_excel(xls, 'UPS_Rates')
 
@@ -1526,16 +1481,16 @@ tbl_mi_clientRates = tbl_publishedRates[(tbl_publishedRates['SERVICE_CODE'] == '
                                           (tbl_publishedRates['SERVICE_CODE'] == 'MIPH')]
 
 
-tbl_dhl_clientRates['CLIENT_RATES'] = round(tbl_dhl_clientRates['BARRETT_RATES']/(1 - Margin_on_DHL),2)
-tbl_usps_clientRates['CLIENT_RATES'] = round(tbl_usps_clientRates['BARRETT_RATES']/(1 - Margin_on_USPS),2)
-tbl_mi_clientRates['CLIENT_RATES'] = round(tbl_mi_clientRates['BARRETT_RATES']/(1 - Margin_on_MI),2)
+tbl_dhl_clientRates['CLIENT_RATES'] = round(tbl_dhl_clientRates['Company_RATES']/(1 - Margin_on_DHL),2)
+tbl_usps_clientRates['CLIENT_RATES'] = round(tbl_usps_clientRates['Company_RATES']/(1 - Margin_on_USPS),2)
+tbl_mi_clientRates['CLIENT_RATES'] = round(tbl_mi_clientRates['Company_RATES']/(1 - Margin_on_MI),2)
 
 
 tbl_clientRates = pd.concat([tbl_ups_clientRates, tbl_dhl_clientRates, tbl_usps_clientRates, tbl_mi_clientRates])
 tbl_clientRates = tbl_clientRates.reindex(columns=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'PUBLISHED_RATES', 'CLIENT_RATES', 'VERSION', 'START_DATE', 'END_DATE'])
 
 #get the finalized tbl_publishedRates
-tbl_clientRates = tbl_BarrettRates.merge(tbl_clientRates[['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'VERSION', 'START_DATE', 'END_DATE', 'CLIENT_RATES']], left_on=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'VERSION', 'START_DATE', 'END_DATE'], right_on=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'VERSION', 'START_DATE', 'END_DATE'], how='left')
+tbl_clientRates = tbl_CompanyRates.merge(tbl_clientRates[['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'VERSION', 'START_DATE', 'END_DATE', 'CLIENT_RATES']], left_on=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'VERSION', 'START_DATE', 'END_DATE'], right_on=['SERVICE_CODE', 'SERVICE_PLAINTEXT', 'ZONE', 'WEIGHT_OZ', 'WEIGHT_LB', 'VERSION', 'START_DATE', 'END_DATE'], how='left')
 #tbl_clientRates.to_csv('test.csv')
 
 
@@ -1659,7 +1614,7 @@ nqd_dhl_date_3 = pd.to_datetime(nqd_dhl_date_3)
 nqd_dhl_date_4 = pd.to_datetime(nqd_dhl_date_4)
 
 # Step 3 - a. Prepare PLD for rerate
-* Regardless of various types of PLD, Client PLD, Barrett PLD, etc.
+* Regardless of various types of PLD, Client PLD, Company PLD, etc.
 
 # Load PLD
 
@@ -2090,55 +2045,36 @@ tbl_BP['ZONE'] = tbl_BP['ZONE'].astype(str).str.replace('\.0$', '').astype(int)
 
 # Step 3 - b. Rerate Begin
 #====================UPS====================
-
 #REDE (UPS NDA Early): commercial & residential, lb    
-
 #RED (UPS NDA): commercial & residential, lb
-
 #REDS (UPS NDA Saver): commercial & residential, lb
-
 #2DAM (UPS 2DA A.M.): commercial & residential, lb
-
 #BLUE (UPS 2DA): commercial & residential, lb
-
 #ORNG (UPS 3DA): commercial & residential, lb
-
 #GRND (UPS Ground Commercial): commercial only, lb
-
 #GRES (UPS Ground Residential): residential only, lb
-
 #SRPT<1 (UPS Surepost 1#>): commercial & residential, oz
-
 #SRPT (UPS Surepost): commercial & residential, lb
 
 #====================DHL====================
-
 #DHLG (DHL SmartMail Parcel Plus Ground 1-25): commercial & residential, lb
-
 #DHLG<1 (DHL SmartMail Parcel Ground < 1lb): commercial & residential, oz
-
 #DHLE (DHL SmartMail Parcel Plus Expedited 1-25): commercial & residential, lb
-
 #DHLE<1 (DHL SmartMail Parcel Expedited  < 1lb): commercial & residential, oz
-
 #DHLEM (DHL SmartMail Parcel Expedited Max): commercial & residential, both oz and lb
 
 #====================USPS====================
-
 #USPSAG (USPS Auctane GRND): commercial & residential, lb
-
 #USPSAP (USPS Auctane PM): commercial & residential, lb
 
 #==========================MI===========================================
-
 #MIPLE (MI Parcel Select Lightweight Expedited): commercial & residential, oz
-
 #MIPH (MI Parcel Select Heavyweight): commercial & residential, lb
 
 # ========= UPS Section ==========
 
 # add a column named DAS_CATEGORY to PLD with ups accessorial category DAS, DASE, RA, HI, or AK. One package (or row) can only have one single category.
-tbl_area_surcharge = pd.read_excel('C:\\Users\\sliu\\BD\\re-rate_model\\areaSurchargeZipsUs_2023.xlsx')
+tbl_area_surcharge = pd.read_excel('C:\\Users\\xx\\xx\\xx\\areaSurchargeZipsUs_2023.xlsx')
 tbl_area_surcharge['Zip'] = tbl_area_surcharge['Zip'].astype(str)
 tbl_area_surcharge['Zip'] = tbl_area_surcharge['Zip'].apply(lambda x: '0' + x if len(x) == 4 else ('00' + x if (len(x) == 3) else x))
 
@@ -2940,28 +2876,9 @@ tbl_PLD_original_SRPT['TOTAL_SRPT'] = round(tbl_PLD_original_SRPT.apply(lambda r
                                                                   (1 + row['FSC%_SRPT']) * (row['FRT_SRPT'] + row['RES_SRPT'] + row['DAS_SRPT'] + row['AHS_SRPT']) if not pd.isna(row['FRT_SRPT']) and row['FRT_SRPT'] != '' else np.nan, axis=1),2)
 #tbl_PLD_original_SRPT.to_csv('test.csv')
 
+
+
 # DHLG (DHL SmartMail Parcel Plus Ground)
-
-5114358: Franklin (FRA) -> 02038_Outbound
-
-5122444: Somerset, no DHLEM (JER) -> 08873_Outbound
-
-5122723: 8150 Nail Olive Branch (MS2) -> 38654_Outbound
-
-5122739: Nail rd Olive branch (MS3) -> 38654_Outbound
-
-5122855: Garland TX (TX1) -> 75041_Outbound
-
-5122890: Oofos -> is/will be in Byhalia, MS)
-
-5122893: Memphis (TN2, TN3) -> 38141_Outbound
-
-5123280: (MAN) 
-
-5123282: Bridgewater (MA5)
-
-5123283: Curtis Bay (GBM) -> 21226_Outbound
-
 
 # DHLG
 
@@ -3001,36 +2918,33 @@ tbl_PLD_original_DHLG['FSC_DHLG'] = tbl_PLD_original_DHLG.apply(lambda row: row[
 tbl_PLD_original_DHLG['SHIP_DATE'] = pd.to_datetime(tbl_PLD_original_DHLG['SHIP_DATE'])
 
 # billed weight calculation situations: 
-# situation 1: actual weight <= 1 lb, use np.ceil(row['BILLED_WEIGHT_OZ']/16) or below, use 1 lb
-# situation 2: actual weight > 1 lb, and cubic inch < 1728, use round up (actual weight)
-# situation 3: actual weight > 1 lb, and cubic inch >= 1728, use billed weight
 
 #dim
 tbl_PLD_original_DHLG['NQD_DHLG_1'] = tbl_PLD_original_DHLG.apply(lambda row: 
-                                                            2.5 * row['BILLED_WEIGHT_LB'] if (row['ACTUAL_WEIGHT'] >= 1 and row['CUBIC_INCH'] >= 1728 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
-                                                           (2 * row['BILLED_WEIGHT_LB'] if (row['ACTUAL_WEIGHT'] >= 1 and row['CUBIC_INCH'] >= 1728 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else 
+                                                            xx * row['BILLED_WEIGHT_LB'] if (row['ACTUAL_WEIGHT'] >= xx and row['CUBIC_INCH'] >= xx and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
+                                                           (xx * row['BILLED_WEIGHT_LB'] if (row['ACTUAL_WEIGHT'] >= xx and row['CUBIC_INCH'] >= xx and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else 
                                                            0), axis=1)
 
 #girth + L(As > 84 is unaccepted, needs a special character to mark it, however, we cannot add up this)
 tbl_PLD_original_DHLG['NQD_DHLG_2'] = tbl_PLD_original_DHLG.apply(lambda row:
-                                                            2.5 * row['BILLED_WEIGHT_LB'] if (row['GIRTH_AND_L'] > 50 and row['GIRTH_AND_L'] <= 84 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
-                                                           (2 * row['BILLED_WEIGHT_LB'] if (row['GIRTH_AND_L'] > 50 and row['GIRTH_AND_L'] <= 84 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
+                                                            xx * row['BILLED_WEIGHT_LB'] if (row['GIRTH_AND_L'] > xx and row['GIRTH_AND_L'] <= xx and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
+                                                           (xx * row['BILLED_WEIGHT_LB'] if (row['GIRTH_AND_L'] > xx and row['GIRTH_AND_L'] <= xx and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
                                                            (np.nan if (row['GIRTH_AND_L'] > 84) else 0)), axis=1)
 
 #longest side_1
 tbl_PLD_original_DHLG['NQD_DHLG_3'] = tbl_PLD_original_DHLG.apply(lambda row: 
-                                                            2.5 * row['BILLED_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
-                                                           (2 * row['BILLED_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
+                                                            xx * row['BILLED_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
+                                                           (xx * row['BILLED_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
                                                            0), axis=1)
 
 #longest side_2
 tbl_PLD_original_DHLG['NQD_DHLG_4'] = tbl_PLD_original_DHLG.apply(lambda row:
-                                                           4.5 if (max(row['L'], row['W'], row['H']) > 22 and max(row['L'], row['W'], row['H']) <= 30) else
-                                                           (15.5 if (max(row['L'], row['W'], row['H']) > 30) else 
+                                                           xx if (max(row['L'], row['W'], row['H']) > 22 and max(row['L'], row['W'], row['H']) <= 30) else
+                                                           (xx if (max(row['L'], row['W'], row['H']) > 30) else 
                                                            0), axis=1)
 #volume
 tbl_PLD_original_DHLG['NQD_DHLG_5'] = tbl_PLD_original_DHLG.apply(lambda row: 
-                                                            15.5 if (row['CUBIC_INCH'] > 3456) else 
+                                                            xx if (row['CUBIC_INCH'] > xx) else 
                                                            (0), axis=1)
 
 
@@ -3049,26 +2963,6 @@ tbl_PLD_original_DHLG['TOTAL_DHLG'] = round(tbl_PLD_original_DHLG.apply(lambda r
 #tbl_PLD_original_DHLG.to_csv('test.csv')
 
 # DHLG<1 (DHL SmartMail Parcel Ground)
-
-5114358: Franklin (FRA) -> 02038_Outbound
-
-5122444: Somerset, no DHLEM (JER) -> 08873_Outbound
-
-5122723: 8150 Nail Olive Branch (MS2) -> 38654_Outbound
-
-5122739: Nail rd Olive branch (MS3) -> 38654_Outbound
-
-5122855: Garland TX (TX1) -> 75041_Outbound
-
-5122890: Oofos -> is/will be in Byhalia, MS)
-
-5122893: Memphis (TN2, TN3) -> 38141_Outbound
-
-5123280: (MAN) 
-
-5123282: Bridgewater (MA5)
-
-5123283: Curtis Bay (GBM) -> 21226_Outbound
 
 # DHLG<1
 
@@ -3111,42 +3005,32 @@ tbl_PLD_original_DHLG1['FSC_DHLG1'] = tbl_PLD_original_DHLG1.apply(lambda row: r
 tbl_PLD_original_DHLG1['SHIP_DATE'] = pd.to_datetime(tbl_PLD_original_DHLG1['SHIP_DATE'])
 
 # billed weight calculation situations: 
-# situation 1: actual weight <= 1 lb, use np.ceil(row['BILLED_WEIGHT_OZ']/16) or below, use 1 lb
-# situation 2: actual weight > 1 lb, and cubic inch < 1728, use round up (actual weight)
-# situation 3: actual weight > 1 lb, and cubic inch >= 1728, use billed weight
-
 #dim, billed weight is used to determine NQD, there is no <1 lb here
 tbl_PLD_original_DHLG1['NQD_DHLG1_1'] = tbl_PLD_original_DHLG1.apply(lambda row: 
-                                                            2.5 * max(row['ACTUAL_WEIGHT_LB'], np.ceil(row['CUBIC_INCH']/dim_factor_dhl)) if (row['ACTUAL_WEIGHT'] >= 1 and row['CUBIC_INCH'] >= 1728 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
-                                                           (2 * max(row['ACTUAL_WEIGHT_LB'], np.ceil(row['CUBIC_INCH']/dim_factor_dhl)) if (row['ACTUAL_WEIGHT'] >= 1 and row['CUBIC_INCH'] >= 1728 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else 
+                                                            xx * max(row['ACTUAL_WEIGHT_LB'], np.ceil(row['CUBIC_INCH']/dim_factor_dhl)) if (row['ACTUAL_WEIGHT'] >= xx and row['CUBIC_INCH'] >= xx and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
+                                                           (xx * max(row['ACTUAL_WEIGHT_LB'], np.ceil(row['CUBIC_INCH']/dim_factor_dhl)) if (row['ACTUAL_WEIGHT'] >= xx and row['CUBIC_INCH'] >= xx and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else 
                                                            0), axis=1)
 
 
-#girth + L(As > 84 is unaccepted, needs a special character to mark it, however, we cannot add up this, so we make it null)
-#1 over 1lbs, under lbs
-#and those < 1 lb will use lb to determine NQD
-# situation 1: actual weight <= 1 lb, use np.ceil(row['BILLED_WEIGHT_OZ']/16)
-# situation 2: actual weight > 1 lb, and cubic inch < 1728, use actual weight
-# situation 3: actual weight > 1 lb, and cubic inch >= 1728, use billed weight
 tbl_PLD_original_DHLG1['NQD_DHLG1_2'] = tbl_PLD_original_DHLG1.apply(lambda row:
-                                                            2.5 * row['ACTUAL_WEIGHT_LB'] if (row['GIRTH_AND_L'] > 50 and row['GIRTH_AND_L'] <= 84 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
-                                                           (2 * row['ACTUAL_WEIGHT_LB'] if (row['GIRTH_AND_L'] > 50 and row['GIRTH_AND_L'] <= 84 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
-                                                           (np.nan if (row['GIRTH_AND_L'] > 84) else 0)), axis=1)
+                                                            xx * row['ACTUAL_WEIGHT_LB'] if (row['GIRTH_AND_L'] > xx and row['GIRTH_AND_L'] <= xx and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
+                                                           (xx * row['ACTUAL_WEIGHT_LB'] if (row['GIRTH_AND_L'] > xx and row['GIRTH_AND_L'] <= xx and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
+                                                           (np.nan if (row['GIRTH_AND_L'] > xx) else 0)), axis=1)
 
 #longest side_1
 tbl_PLD_original_DHLG1['NQD_DHLG1_3'] = tbl_PLD_original_DHLG1.apply(lambda row: 
-                                                            2.5 * row['ACTUAL_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
-                                                           (2 * row['ACTUAL_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
+                                                            xx * row['ACTUAL_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
+                                                           (xx * row['ACTUAL_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
                                                            0), axis=1)
 
 #longest side_2
 tbl_PLD_original_DHLG1['NQD_DHLG1_4'] = tbl_PLD_original_DHLG1.apply(lambda row:
-                                                           4.5 if (max(row['L'], row['W'], row['H']) > 22 and max(row['L'], row['W'], row['H']) <= 30) else
-                                                           (15.5 if (max(row['L'], row['W'], row['H']) > 30) else 
+                                                           xx if (max(row['L'], row['W'], row['H']) > 22 and max(row['L'], row['W'], row['H']) <= 30) else
+                                                           (xx if (max(row['L'], row['W'], row['H']) > 30) else 
                                                            0), axis=1)
 #volume
 tbl_PLD_original_DHLG1['NQD_DHLG1_5'] = tbl_PLD_original_DHLG1.apply(lambda row: 
-                                                            15.5 if (row['CUBIC_INCH'] > 3456) else 
+                                                            xx if (row['CUBIC_INCH'] > xx) else 
                                                            (0), axis=1)
 
 
@@ -3165,26 +3049,6 @@ tbl_PLD_original_DHLG1['TOTAL_DHLG1'] = round(tbl_PLD_original_DHLG1.apply(lambd
 
 # DHLE (DHL SmartMail Parcel Plus Expedited)
 
-5114358: Franklin (FRA) -> 02038_Outbound
-
-5122444: Somerset, no DHLEM (JER) -> 08873_Outbound
-
-5122723: 8150 Nail Olive Branch (MS2) -> 38654_Outbound
-
-5122739: Nail rd Olive branch (MS3) -> 38654_Outbound
-
-5122855: Garland TX (TX1) -> 75041_Outbound
-
-5122890: Oofos -> is/will be in Byhalia, MS)
-
-5122893: Memphis (TN2, TN3) -> 38141_Outbound
-
-5123280: (MAN) 
-
-5123282: Bridgewater (MA5)
-
-5123283: Curtis Bay (GBM) -> 21226_Outbound
-
 #Select the rate to use, #Decide the part of PLD to rerate
 #get client rate and a copy of PLD
 tbl_clientRates_13 = tbl_clientRates[(tbl_clientRates['SERVICE_CODE'] == 'DHLE_5122893')]
@@ -3192,7 +3056,7 @@ tbl_PLD_original_DHLE = tbl_BP.copy()
 
 #Start to rerate
 #add billed weight column to PLD
-tbl_PLD_original_DHLE['BILLED_WEIGHT_LB'] = tbl_PLD_original_DHLE.apply(lambda row: max(row['ACTUAL_WEIGHT_LB'], np.ceil(row['CUBIC_INCH']/dim_factor_dhl)) if (row['CUBIC_INCH'] >= 1728 and row['ACTUAL_WEIGHT'] >= 1) else
+tbl_PLD_original_DHLE['BILLED_WEIGHT_LB'] = tbl_PLD_original_DHLE.apply(lambda row: max(row['ACTUAL_WEIGHT_LB'], np.ceil(row['CUBIC_INCH']/dim_factor_dhl)) if (row['CUBIC_INCH'] >= xx and row['ACTUAL_WEIGHT'] >= xx) else
                                                                           (row['ACTUAL_WEIGHT_LB']), axis=1)
 
 #add Freight column to PLD
@@ -3224,37 +3088,34 @@ tbl_PLD_original_DHLE['FSC_DHLE'] = tbl_PLD_original_DHLE.apply(lambda row: row[
 tbl_PLD_original_DHLE['SHIP_DATE'] = pd.to_datetime(tbl_PLD_original_DHLE['SHIP_DATE'])
 
 # billed weight calculation situations: 
-# situation 1: actual weight <= 1 lb, use np.ceil(row['BILLED_WEIGHT_OZ']/16) or below, use 1 lb
-# situation 2: actual weight > 1 lb, and cubic inch < 1728, use round up (actual weight)
-# situation 3: actual weight > 1 lb, and cubic inch >= 1728, use billed weight
 
 #dim
 tbl_PLD_original_DHLE['NQD_DHLE_1'] = tbl_PLD_original_DHLE.apply(lambda row: 
-                                                            2.5 * row['BILLED_WEIGHT_LB'] if (row['ACTUAL_WEIGHT'] >= 1 and row['CUBIC_INCH'] >= 1728 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
-                                                           (2 * row['BILLED_WEIGHT_LB'] if (row['ACTUAL_WEIGHT'] >= 1 and row['CUBIC_INCH'] >= 1728 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else 
+                                                            xx * row['BILLED_WEIGHT_LB'] if (row['ACTUAL_WEIGHT'] >= xx and row['CUBIC_INCH'] >= xx and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
+                                                           (xx * row['BILLED_WEIGHT_LB'] if (row['ACTUAL_WEIGHT'] >= xx and row['CUBIC_INCH'] >= xx and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else 
                                                            0), axis=1)
 
 
 #girth + L(As > 84 is unaccepted, needs a special character to mark it, however, we cannot add up this)
 tbl_PLD_original_DHLE['NQD_DHLE_2'] = tbl_PLD_original_DHLE.apply(lambda row:
-                                                            2.5 * row['BILLED_WEIGHT_LB'] if (row['GIRTH_AND_L'] > 50 and row['GIRTH_AND_L'] <= 84 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
-                                                           (2 * row['BILLED_WEIGHT_LB'] if (row['GIRTH_AND_L'] > 50 and row['GIRTH_AND_L'] <= 84 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
+                                                            xx * row['BILLED_WEIGHT_LB'] if (row['GIRTH_AND_L'] > xx and row['GIRTH_AND_L'] <= xx and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
+                                                           (xx * row['BILLED_WEIGHT_LB'] if (row['GIRTH_AND_L'] > xx and row['GIRTH_AND_L'] <= xx and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
                                                            (np.nan if (row['GIRTH_AND_L'] > 84) else 0)), axis=1)
 
 #longest side_1
 tbl_PLD_original_DHLE['NQD_DHLE_3'] = tbl_PLD_original_DHLE.apply(lambda row: 
-                                                            2.5 * row['BILLED_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
-                                                           (2 * row['BILLED_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
+                                                            xx * row['BILLED_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
+                                                           (xx * row['BILLED_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
                                                            0), axis=1)
 
 #longest side_2
 tbl_PLD_original_DHLE['NQD_DHLE_4'] = tbl_PLD_original_DHLE.apply(lambda row:
-                                                           4.5 if (max(row['L'], row['W'], row['H']) > 22 and max(row['L'], row['W'], row['H']) <= 30) else
-                                                           (15.5 if (max(row['L'], row['W'], row['H']) > 30) else 
+                                                           xx if (max(row['L'], row['W'], row['H']) > 22 and max(row['L'], row['W'], row['H']) <= 30) else
+                                                           (xx if (max(row['L'], row['W'], row['H']) > 30) else 
                                                            0), axis=1)
 #volume
 tbl_PLD_original_DHLE['NQD_DHLE_5'] = tbl_PLD_original_DHLE.apply(lambda row: 
-                                                            15.5 if (row['CUBIC_INCH'] > 3456) else 
+                                                            xx if (row['CUBIC_INCH'] > xx) else 
                                                            (0), axis=1)
 
 
@@ -3274,26 +3135,6 @@ tbl_PLD_original_DHLE['TOTAL_DHLE'] = round(tbl_PLD_original_DHLE.apply(lambda r
 #tbl_PLD_original_DHLE.to_csv('test.csv')
 
 # DHLE<1 (DHL SmartMail Parcel Expedited)
-
-5114358: Franklin (FRA) -> 02038_Outbound
-
-5122444: Somerset, no DHLEM (JER) -> 08873_Outbound
-
-5122723: 8150 Nail Olive Branch (MS2) -> 38654_Outbound
-
-5122739: Nail rd Olive branch (MS3) -> 38654_Outbound
-
-5122855: Garland TX (TX1) -> 75041_Outbound
-
-5122890: Oofos -> is/will be in Byhalia, MS)
-
-5122893: Memphis (TN2, TN3) -> 38141_Outbound
-
-5123280: (MAN) 
-
-5123282: Bridgewater (MA5)
-
-5123283: Curtis Bay (GBM) -> 21226_Outbound
 
 # DHLE<1
 
@@ -3336,42 +3177,33 @@ tbl_PLD_original_DHLE1['FSC_DHLE1'] = tbl_PLD_original_DHLE1.apply(lambda row: r
 tbl_PLD_original_DHLE1['SHIP_DATE'] = pd.to_datetime(tbl_PLD_original_DHLE1['SHIP_DATE'])
 
 # billed weight calculation situations: 
-# situation 1: actual weight <= 1 lb, use np.ceil(row['BILLED_WEIGHT_OZ']/16) or below, use 1 lb
-# situation 2: actual weight > 1 lb, and cubic inch < 1728, use round up (actual weight)
-# situation 3: actual weight > 1 lb, and cubic inch >= 1728, use billed weight
 
 #dim, billed weight is used to determine NQD, there is no <1 lb here
 tbl_PLD_original_DHLE1['NQD_DHLE1_1'] = tbl_PLD_original_DHLE1.apply(lambda row: 
-                                                            2.5 * max(row['ACTUAL_WEIGHT_LB'], np.ceil(row['CUBIC_INCH']/dim_factor_dhl)) if (row['ACTUAL_WEIGHT'] >= 1 and row['CUBIC_INCH'] >= 1728 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
-                                                           (2 * max(row['ACTUAL_WEIGHT_LB'], np.ceil(row['CUBIC_INCH']/dim_factor_dhl)) if (row['ACTUAL_WEIGHT'] >= 1 and row['CUBIC_INCH'] >= 1728 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else 
+                                                            xx * max(row['ACTUAL_WEIGHT_LB'], np.ceil(row['CUBIC_INCH']/dim_factor_dhl)) if (row['ACTUAL_WEIGHT'] >= 1 and row['CUBIC_INCH'] >= xx and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
+                                                           (xx * max(row['ACTUAL_WEIGHT_LB'], np.ceil(row['CUBIC_INCH']/dim_factor_dhl)) if (row['ACTUAL_WEIGHT'] >= 1 and row['CUBIC_INCH'] >= xx and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else 
                                                            0), axis=1)
 
 
-#girth + L(As > 84 is unaccepted, needs a special character to mark it, however, we cannot add up this, so we make it null)
-#1 over 1lbs, under lbs
-#and those < 1 lb will use lb to determine NQD
-# situation 1: actual weight <= 1 lb, use np.ceil(row['BILLED_WEIGHT_OZ']/16)
-# situation 2: actual weight > 1 lb, and cubic inch < 1728, use actual weight
-# situation 3: actual weight > 1 lb, and cubic inch >= 1728, use billed weight
 tbl_PLD_original_DHLE1['NQD_DHLE1_2'] = tbl_PLD_original_DHLE1.apply(lambda row:
-                                                            2.5 * row['ACTUAL_WEIGHT_LB'] if (row['GIRTH_AND_L'] > 50 and row['GIRTH_AND_L'] <= 84 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
-                                                           (2 * row['ACTUAL_WEIGHT_LB'] if (row['GIRTH_AND_L'] > 50 and row['GIRTH_AND_L'] <= 84 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
-                                                           (np.nan if (row['GIRTH_AND_L'] > 84) else 0)), axis=1)
+                                                            xx * row['ACTUAL_WEIGHT_LB'] if (row['GIRTH_AND_L'] > xx and row['GIRTH_AND_L'] <= xx and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
+                                                           (xx * row['ACTUAL_WEIGHT_LB'] if (row['GIRTH_AND_L'] > xx and row['GIRTH_AND_L'] <= xx and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
+                                                           (np.nan if (row['GIRTH_AND_L'] > xx) else 0)), axis=1)
 
 #longest side_1
 tbl_PLD_original_DHLE1['NQD_DHLE1_3'] = tbl_PLD_original_DHLE1.apply(lambda row: 
-                                                            2.5 * row['ACTUAL_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
-                                                           (2 * row['ACTUAL_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
+                                                            xx * row['ACTUAL_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
+                                                           (xx * row['ACTUAL_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
                                                            0), axis=1)
 
 #longest side_2
 tbl_PLD_original_DHLE1['NQD_DHLE1_4'] = tbl_PLD_original_DHLE1.apply(lambda row:
-                                                           4.5 if (max(row['L'], row['W'], row['H']) > 22 and max(row['L'], row['W'], row['H']) <= 30) else
-                                                           (15.5 if (max(row['L'], row['W'], row['H']) > 30) else 
+                                                           xx if (max(row['L'], row['W'], row['H']) > 22 and max(row['L'], row['W'], row['H']) <= 30) else
+                                                           (xx if (max(row['L'], row['W'], row['H']) > 30) else 
                                                            0), axis=1)
 #volume
 tbl_PLD_original_DHLE1['NQD_DHLE1_5'] = tbl_PLD_original_DHLE1.apply(lambda row: 
-                                                            15.5 if (row['CUBIC_INCH'] > 3456) else 
+                                                           xx if (row['CUBIC_INCH'] > xx) else 
                                                            (0), axis=1)
 
 
@@ -3389,26 +3221,6 @@ tbl_PLD_original_DHLE1['TOTAL_DHLE1'] = round(tbl_PLD_original_DHLE1.apply(lambd
 #tbl_PLD_original_DHLE1.to_csv('test.csv')
 
 # DHLEM (DHL SmartMail Parcel Expedited Max)
-
-5114358: Franklin (FRA) -> 02038_Outbound
-
-5122444: Somerset, no DHLEM (JER) -> 08873_Outbound
-
-5122723: 8150 Nail Olive Branch (MS2) -> 38654_Outbound
-
-5122739: Nail rd Olive branch (MS3) -> 38654_Outbound
-
-5122855: Garland TX (TX1) -> 75041_Outbound
-
-5122890: Oofos -> is/will be in Byhalia, MS)
-
-5122893: Memphis (TN2, TN3) -> 38141_Outbound
-
-5123280: (MAN) 
-
-5123282: Bridgewater (MA5)
-
-5123283: Curtis Bay (GBM) -> 21226_Outbound
 
 # DHLEM
 
@@ -3453,42 +3265,33 @@ tbl_PLD_original_DHLEM1['FSC_DHLEM'] = tbl_PLD_original_DHLEM1.apply(lambda row:
 tbl_PLD_original_DHLEM1['SHIP_DATE'] = pd.to_datetime(tbl_PLD_original_DHLEM1['SHIP_DATE'])
 
 # billed weight calculation situations: 
-# situation 1: actual weight <= 1 lb, use np.ceil(row['BILLED_WEIGHT_OZ']/16) or below, use 1 lb
-# situation 2: actual weight > 1 lb, and cubic inch < 1728, use round up (actual weight)
-# situation 3: actual weight > 1 lb, and cubic inch >= 1728, use billed weight
 
 #dim, billed weight is used to determine NQD, there is no <1 lb here
 tbl_PLD_original_DHLEM1['NQD_DHLEM_1'] = tbl_PLD_original_DHLEM1.apply(lambda row: 
-                                                            2.5 * max(row['ACTUAL_WEIGHT_LB'], np.ceil(row['CUBIC_INCH']/dim_factor_dhl)) if (row['ACTUAL_WEIGHT'] >= 1 and row['CUBIC_INCH'] >= 1728 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
-                                                           (2 * max(row['ACTUAL_WEIGHT_LB'], np.ceil(row['CUBIC_INCH']/dim_factor_dhl)) if (row['ACTUAL_WEIGHT'] >= 1 and row['CUBIC_INCH'] >= 1728 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else 
+                                                            xx * max(row['ACTUAL_WEIGHT_LB'], np.ceil(row['CUBIC_INCH']/dim_factor_dhl)) if (row['ACTUAL_WEIGHT'] >= xx and row['CUBIC_INCH'] >= xx and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
+                                                           (xx * max(row['ACTUAL_WEIGHT_LB'], np.ceil(row['CUBIC_INCH']/dim_factor_dhl)) if (row['ACTUAL_WEIGHT'] >= xx and row['CUBIC_INCH'] >= xx and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else 
                                                            0), axis=1)
 
 
-#girth + L(As > 84 is unaccepted, needs a special character to mark it, however, we cannot add up this, so we make it null)
-#1 over 1lbs, under lbs
-#and those < 1 lb will use lb to determine NQD
-# situation 1: actual weight <= 1 lb, use np.ceil(row['BILLED_WEIGHT_OZ']/16)
-# situation 2: actual weight > 1 lb, and cubic inch < 1728, use actual weight
-# situation 3: actual weight > 1 lb, and cubic inch >= 1728, use billed weight
 tbl_PLD_original_DHLEM1['NQD_DHLEM_2'] = tbl_PLD_original_DHLEM1.apply(lambda row:
-                                                            2.5 * row['ACTUAL_WEIGHT_LB'] if (row['GIRTH_AND_L'] > 50 and row['GIRTH_AND_L'] <= 84 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
-                                                           (2 * row['ACTUAL_WEIGHT_LB'] if (row['GIRTH_AND_L'] > 50 and row['GIRTH_AND_L'] <= 84 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
+                                                            xx * row['ACTUAL_WEIGHT_LB'] if (row['GIRTH_AND_L'] > 50 and row['GIRTH_AND_L'] <= 84 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
+                                                           (xx * row['ACTUAL_WEIGHT_LB'] if (row['GIRTH_AND_L'] > 50 and row['GIRTH_AND_L'] <= 84 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
                                                            (np.nan if (row['GIRTH_AND_L'] > 84) else 0)), axis=1)
 
 #longest side_1
 tbl_PLD_original_DHLEM1['NQD_DHLEM_3'] = tbl_PLD_original_DHLEM1.apply(lambda row: 
-                                                            2.5 * row['ACTUAL_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
-                                                           (2 * row['ACTUAL_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
+                                                            xx * row['ACTUAL_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
+                                                           (xx * row['ACTUAL_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
                                                            0), axis=1)
 
 #longest side_2
 tbl_PLD_original_DHLEM1['NQD_DHLEM_4'] = tbl_PLD_original_DHLEM1.apply(lambda row:
-                                                           4.5 if (max(row['L'], row['W'], row['H']) > 22 and max(row['L'], row['W'], row['H']) <= 30) else
-                                                           (15.5 if (max(row['L'], row['W'], row['H']) > 30) else 
+                                                           xx if (max(row['L'], row['W'], row['H']) > 22 and max(row['L'], row['W'], row['H']) <= 30) else
+                                                           (xx if (max(row['L'], row['W'], row['H']) > 30) else 
                                                            0), axis=1)
 #volume
 tbl_PLD_original_DHLEM1['NQD_DHLEM_5'] = tbl_PLD_original_DHLEM1.apply(lambda row: 
-                                                            15.5 if (row['CUBIC_INCH'] > 3456) else 
+                                                            xx if (row['CUBIC_INCH'] > xx) else 
                                                            (0), axis=1)
 
 
@@ -3546,37 +3349,34 @@ tbl_PLD_original_DHLEM['FSC_DHLEM'] = tbl_PLD_original_DHLEM.apply(lambda row: r
 tbl_PLD_original_DHLEM['SHIP_DATE'] = pd.to_datetime(tbl_PLD_original_DHLEM['SHIP_DATE'])
 
 # billed weight calculation situations: 
-# situation 1: actual weight <= 1 lb, use np.ceil(row['BILLED_WEIGHT_OZ']/16) or below, use 1 lb
-# situation 2: actual weight > 1 lb, and cubic inch < 1728, use round up (actual weight)
-# situation 3: actual weight > 1 lb, and cubic inch >= 1728, use billed weight
 
 #dim
 tbl_PLD_original_DHLEM['NQD_DHLEM_1'] = tbl_PLD_original_DHLEM.apply(lambda row: 
-                                                            2.5 * row['BILLED_WEIGHT_LB'] if (row['ACTUAL_WEIGHT'] >= 1 and row['CUBIC_INCH'] >= 1728 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
-                                                           (2 * row['BILLED_WEIGHT_LB'] if (row['ACTUAL_WEIGHT'] >= 1 and row['CUBIC_INCH'] >= 1728 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else 
+                                                            xx * row['BILLED_WEIGHT_LB'] if (row['ACTUAL_WEIGHT'] >= 1 and row['CUBIC_INCH'] >= xx and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
+                                                           (xx * row['BILLED_WEIGHT_LB'] if (row['ACTUAL_WEIGHT'] >= 1 and row['CUBIC_INCH'] >= xx and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else 
                                                            0), axis=1)
 
 
 #girth + L(As > 84 is unaccepted, needs a special character to mark it, however, we cannot add up this)
 tbl_PLD_original_DHLEM['NQD_DHLEM_2'] = tbl_PLD_original_DHLEM.apply(lambda row:
-                                                            2.5 * row['BILLED_WEIGHT_LB'] if (row['GIRTH_AND_L'] > 50 and row['GIRTH_AND_L'] <= 84 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
-                                                           (2 * row['BILLED_WEIGHT_LB'] if (row['GIRTH_AND_L'] > 50 and row['GIRTH_AND_L'] <= 84 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
+                                                            xx * row['BILLED_WEIGHT_LB'] if (row['GIRTH_AND_L'] > xx and row['GIRTH_AND_L'] <= xx and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
+                                                           (xx * row['BILLED_WEIGHT_LB'] if (row['GIRTH_AND_L'] > xx and row['GIRTH_AND_L'] <= xx and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
                                                            (np.nan if (row['GIRTH_AND_L'] > 84) else 0)), axis=1)
 
 #longest side_1
 tbl_PLD_original_DHLEM['NQD_DHLEM_3'] = tbl_PLD_original_DHLEM.apply(lambda row: 
-                                                            2.5 * row['BILLED_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
-                                                           (2 * row['BILLED_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
+                                                           xx * row['BILLED_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_3 and row['SHIP_DATE'] <= nqd_dhl_date_4) else 
+                                                           (xx * row['BILLED_WEIGHT_LB'] if (max(row['L'], row['W'], row['H']) > 27 and row['SHIP_DATE'] >= nqd_dhl_date_1 and row['SHIP_DATE'] <= nqd_dhl_date_2) else
                                                            0), axis=1)
 
 #longest side_2
 tbl_PLD_original_DHLEM['NQD_DHLEM_4'] = tbl_PLD_original_DHLEM.apply(lambda row:
-                                                           4.5 if (max(row['L'], row['W'], row['H']) > 22 and max(row['L'], row['W'], row['H']) <= 30) else
+                                                           xx if (max(row['L'], row['W'], row['H']) > 22 and max(row['L'], row['W'], row['H']) <= 30) else
                                                            (15.5 if (max(row['L'], row['W'], row['H']) > 30) else 
                                                            0), axis=1)
 #volume
 tbl_PLD_original_DHLEM['NQD_DHLEM_5'] = tbl_PLD_original_DHLEM.apply(lambda row: 
-                                                            15.5 if (row['CUBIC_INCH'] > 3456) else 
+                                                            xx if (row['CUBIC_INCH'] > xx) else 
                                                            (0), axis=1)
 
 
@@ -3607,18 +3407,18 @@ tbl_PLD_original_USPSAG = tbl_BP.copy()
 
 #Rerate start
 #add billed weight column to PLD
-tbl_PLD_original_USPSAG['BILLED_WEIGHT_LB'] = tbl_PLD_original_USPSAG.apply(lambda row: max(row['ACTUAL_WEIGHT_LB'], np.ceil(row['CUBIC_INCH']/dim_factor_usps)) if (row['CUBIC_INCH'] > 1728) else
+tbl_PLD_original_USPSAG['BILLED_WEIGHT_LB'] = tbl_PLD_original_USPSAG.apply(lambda row: max(row['ACTUAL_WEIGHT_LB'], np.ceil(row['CUBIC_INCH']/dim_factor_usps)) if (row['CUBIC_INCH'] > xx) else
                                                                           (row['ACTUAL_WEIGHT_LB']), axis=1)
 
-tbl_PLD_original_USPSAG['BILLED_WEIGHT_OZ'] = tbl_PLD_original_USPSAG.apply(lambda row: max(row['ACTUAL_WEIGHT_LB'], np.ceil(row['CUBIC_INCH']/dim_factor_usps))*16 if (row['CUBIC_INCH'] > 1728) else
+tbl_PLD_original_USPSAG['BILLED_WEIGHT_OZ'] = tbl_PLD_original_USPSAG.apply(lambda row: max(row['ACTUAL_WEIGHT_LB'], np.ceil(row['CUBIC_INCH']/dim_factor_usps))*16 if (row['CUBIC_INCH'] > xx) else
                                                                           (row['ACTUAL_WEIGHT_OZ']), axis=1)
 
 tbl_PLD_original_USPSAG['BILLED_WEIGHT_LB'] = tbl_PLD_original_USPSAG.apply(lambda row:
                                                             row['BILLED_WEIGHT_OZ']/16 if (row['BILLED_WEIGHT_OZ'] <= 16) else 
                                                            (row['BILLED_WEIGHT_LB']), axis=1)
 
-#usps will only rate for those not exceeding 70 lbs
-tbl_PLD_original_USPSAG = tbl_PLD_original_USPSAG[(tbl_PLD_original_USPSAG['BILLED_WEIGHT_LB'] <= 70)]
+#usps will only rate for those not exceeding xx lbs
+tbl_PLD_original_USPSAG = tbl_PLD_original_USPSAG[(tbl_PLD_original_USPSAG['BILLED_WEIGHT_LB'] <= xx)]
 
 
 #add Freight column to PLD
@@ -3642,18 +3442,18 @@ tbl_PLD_original_USPSAG_3 = tbl_PLD_original_USPSAG_3.rename(columns={'CLIENT_RA
 #combine again
 tbl_PLD_original_USPSAG = pd.concat([tbl_PLD_original_USPSAG_3, tbl_PLD_original_USPSAG_none3], axis=0)
 
-#6. Parcels that exceed 22 inches but not greater than 30 inches in length, add $4 per package. 
-#7. parcels that exceed 30 inches in length, add $7 per package. 
+#6. Parcels that exceed 22 inches but not greater than 30 inches in length, add $xx per package. 
+#7. parcels that exceed 30 inches in length, add $xx per package. 
 
 tbl_PLD_original_USPSAG['EXTRA_USPSAG_1'] = tbl_PLD_original_USPSAG.apply(lambda row:
-                                                            4 if (row['L'] > 22 and row['L'] <= 30) else 
-                                                           (7 if (row['L'] > 30) else
+                                                            xx if (row['L'] > 22 and row['L'] <= 30) else 
+                                                           (xx if (row['L'] > 30) else
                                                            (0)), axis=1)
 
 
-#8. parcels that exceed 2 cubic feet (3456 cubic inches), add $15 per package. 
+#8. parcels that exceed xx, add $xx per package. 
 tbl_PLD_original_USPSAG['EXTRA_USPSAG_2'] = tbl_PLD_original_USPSAG.apply(lambda row:
-                                                            15 if (row['CUBIC_INCH'] > 3456) else (0), axis=1)
+                                                            xx if (row['CUBIC_INCH'] > xx) else (0), axis=1)
 
 #Get Total
 # note that for those with non-round up actual weight, if it is < 1, we still assign it the freight rate. 
@@ -3705,18 +3505,18 @@ tbl_PLD_original_USPSAP_3 = tbl_PLD_original_USPSAP_3.rename(columns={'CLIENT_RA
 #combine again
 tbl_PLD_original_USPSAP = pd.concat([tbl_PLD_original_USPSAP_3, tbl_PLD_original_USPSAP_none3], axis=0)
 
-#6. Parcels that exceed 22 inches but not greater than 30 inches in length, add $4 per package. 
-#7. parcels that exceed 30 inches in length, add $7 per package. 
+#6. Parcels that exceed 22 inches but not greater than 30 inches in length, add $xx per package. 
+#7. parcels that exceed 20 inches in length, add $xx per package. 
 
 tbl_PLD_original_USPSAP['EXTRA_USPSAP_1'] = tbl_PLD_original_USPSAP.apply(lambda row:
-                                                            4 if (row['L'] > 22 and row['L'] <= 30) else 
-                                                           (7 if (row['L'] > 30) else
+                                                            xx if (row['L'] > 22 and row['L'] <= 30) else 
+                                                           (xx if (row['L'] > 30) else
                                                            (0)), axis=1)
 
 
-#8. parcels that exceed 2 cubic feet (3456 cubic inches), add $15 per package. 
+#8. parcels that exceed xx, add $xx per package. 
 tbl_PLD_original_USPSAP['EXTRA_USPSAP_2'] = tbl_PLD_original_USPSAP.apply(lambda row:
-                                                            15 if (row['CUBIC_INCH'] > 3456) else (0), axis=1)
+                                                            xx if (row['CUBIC_INCH'] > xx) else (0), axis=1)
 
 #Get Total
 # note that for those with non-round up actual weight, if it is < 1, we still assign it the freight rate. 
@@ -3727,17 +3527,17 @@ tbl_PLD_original_USPSAP['TOTAL_USPSAP'] = round(tbl_PLD_original_USPSAP.apply(la
 #tbl_PLD_original_USPSAP.to_csv('test.csv')
 
 
+
 # MI
 
 #MIPLE (MI Parcel Select Lightweight Expedited): commercial & residential, oz
-
 #MIPH (MI Parcel Select Heavyweight): commercial & residential, lb
 
 # MIPLE (MI Parcel Select Lightweight Expedited)
 
 #select the rate to use, #Decide the part of PLD to rerate
 tbl_clientRates_19 = tbl_clientRates[(tbl_clientRates['SERVICE_CODE'] == 'MIPLE')]
-tbl_PLD_original_MIPLE = tbl_BP[(tbl_BP['ACTUAL_WEIGHT'] < 1) & (tbl_BP['L'] <= 26) & (tbl_BP['W'] <= 26) & (tbl_BP['H'] <= 26)].copy()
+tbl_PLD_original_MIPLE = tbl_BP[(tbl_BP['ACTUAL_WEIGHT'] < xx) & (tbl_BP['L'] <= xx) & (tbl_BP['W'] <= xx) & (tbl_BP['H'] <= xx)].copy()
 
 #Start to rerate
 #add billed weight column to PLD
@@ -3752,13 +3552,13 @@ tbl_PLD_original_MIPLE = tbl_PLD_original_MIPLE.drop('WEIGHT_OZ', axis=1)
 tbl_PLD_original_MIPLE = tbl_PLD_original_MIPLE.rename(columns={'CLIENT_RATES': 'FRT_MIPLE'})
 
 #add fuel surcharge column to PLD
-tbl_PLD_original_MIPLE['FSC_MIPLE'] = tbl_PLD_original_MIPLE.apply(lambda row: row['FRT_MIPLE']*0.065, axis=1)
+tbl_PLD_original_MIPLE['FSC_MIPLE'] = tbl_PLD_original_MIPLE.apply(lambda row: row['FRT_MIPLE']*xx, axis=1)
 
 #add NQD Surcharge column to PLD
 
-# A Non-standard piece fee of $4.00 will apply to any piece with a single side over 22" or with total dimensions over 2 ft.
+# A Non-standard piece fee of $xx will apply to any piece with a single side over 22" or with total dimensions over 2 ft.
 tbl_PLD_original_MIPLE['NQD_MIPLE'] = tbl_PLD_original_MIPLE.apply(lambda row:
-                                                            4 if any([row['L'] > 22, row['W'] > 22, row['H'] > 22, row['CUBIC_INCH'] > 3456]) else
+                                                            xx if any([row['L'] > 22, row['W'] > 22, row['H'] > 22, row['CUBIC_INCH'] > xx]) else
                                                            (0), axis=1)
 
 #Get Total
@@ -3769,15 +3569,16 @@ tbl_PLD_original_MIPLE['TOTAL_MIPLE'] = round(tbl_PLD_original_MIPLE.apply(lambd
 
 #tbl_PLD_original_MIPLE.to_csv('test.csv')
 
+
 # MIPH (MI Parcel Select Heavyweight)
 
 #select the rate to use, #Decide the part of PLD to rerate
 tbl_clientRates_20 = tbl_clientRates[(tbl_clientRates['SERVICE_CODE'] == 'MIPH')]
-tbl_PLD_original_MIPH = tbl_BP[(tbl_BP['L'] <= 26) & (tbl_BP['W'] <= 26) & (tbl_BP['H'] <= 26)].copy()
+tbl_PLD_original_MIPH = tbl_BP[(tbl_BP['L'] <= xx) & (tbl_BP['W'] <= xx) & (tbl_BP['H'] <= xx)].copy()
 
 #Start to rerate
 #add billed weight column to PLD
-tbl_PLD_original_MIPH['BILLED_WEIGHT_LB'] = tbl_PLD_original_MIPH.apply(lambda row: max(row['ACTUAL_WEIGHT_LB'], np.ceil(row['CUBIC_INCH']/dim_factor_mi)) if (row['CUBIC_INCH'] > 1728 and row['ACTUAL_WEIGHT'] >= 1) else
+tbl_PLD_original_MIPH['BILLED_WEIGHT_LB'] = tbl_PLD_original_MIPH.apply(lambda row: max(row['ACTUAL_WEIGHT_LB'], np.ceil(row['CUBIC_INCH']/dim_factor_mi)) if (row['CUBIC_INCH'] > xx and row['ACTUAL_WEIGHT'] >= xx) else
                                                                           (row['ACTUAL_WEIGHT_LB']), axis=1)
 
 
@@ -3789,14 +3590,14 @@ tbl_PLD_original_MIPH = tbl_PLD_original_MIPH.drop('WEIGHT_LB', axis=1)
 tbl_PLD_original_MIPH = tbl_PLD_original_MIPH.rename(columns={'CLIENT_RATES': 'FRT_MIPH'})
 
 #add fuel surcharge column to PLD
-tbl_PLD_original_MIPH['FSC_MIPH'] = tbl_PLD_original_MIPH.apply(lambda row: row['FRT_MIPH']*0.065, axis=1)
+tbl_PLD_original_MIPH['FSC_MIPH'] = tbl_PLD_original_MIPH.apply(lambda row: row['FRT_MIPH']*xx, axis=1)
 
 
 #add NQD Surcharge column to PLD
 
-# A Non-standard piece fee of $4.00 will apply to any piece with a single side over 22" or with total dimensions over 2 ft.
+# A Non-standard piece fee of $xx will apply to any piece with a single side over 22" or with total dimensions over 2 ft.
 tbl_PLD_original_MIPH['NQD_MIPH'] = tbl_PLD_original_MIPH.apply(lambda row:
-                                                            4 if any([row['L'] > 22, row['W'] > 22, row['H'] > 22, row['CUBIC_INCH'] > 3456]) else
+                                                            xx if any([row['L'] > 22, row['W'] > 22, row['H'] > 22, row['CUBIC_INCH'] > xx]) else
                                                            (0), axis=1)
 
 #Get Total
@@ -3815,31 +3616,6 @@ tbl_BP.columns
 
 # Make a copy of the DataFrame with only the specified columns
 tbl_PLD_original_rerated = tbl_BP.copy()
-
-# Specify the prioritized Services
-
-tbl_PLD_original_REDE = tbl_PLD_original_REDE.drop_duplicates()
-tbl_PLD_original_RED = tbl_PLD_original_RED.drop_duplicates()
-tbl_PLD_original_REDS = tbl_PLD_original_REDS.drop_duplicates()
-tbl_PLD_original_2DAM = tbl_PLD_original_2DAM.drop_duplicates()
-tbl_PLD_original_BLUE = tbl_PLD_original_BLUE.drop_duplicates()
-tbl_PLD_original_ORNG = tbl_PLD_original_ORNG.drop_duplicates()
-tbl_PLD_original_GRND = tbl_PLD_original_GRND.drop_duplicates()
-tbl_PLD_original_GRES = tbl_PLD_original_GRES.drop_duplicates()
-tbl_PLD_original_SRPT1 = tbl_PLD_original_SRPT1.drop_duplicates()
-tbl_PLD_original_SRPT = tbl_PLD_original_SRPT.drop_duplicates()
-
-#tbl_PLD_original_DHLG = tbl_PLD_original_DHLG.drop_duplicates()
-#tbl_PLD_original_DHLG1 = tbl_PLD_original_DHLG1.drop_duplicates()
-#tbl_PLD_original_DHLE = tbl_PLD_original_DHLE.drop_duplicates()
-#tbl_PLD_original_DHLE1 = tbl_PLD_original_DHLE1.drop_duplicates()
-#tbl_PLD_original_DHLEM = tbl_PLD_original_DHLEM.drop_duplicates()
-
-tbl_PLD_original_USPSAG = tbl_PLD_original_USPSAG.drop_duplicates()
-tbl_PLD_original_USPSAP = tbl_PLD_original_USPSAP.drop_duplicates()
-tbl_PLD_original_MIPLE = tbl_PLD_original_MIPLE.drop_duplicates()
-tbl_PLD_original_MIPH = tbl_PLD_original_MIPH.drop_duplicates()
-
 
 # List only the total rates of all carrier services. 
 tbl_PLD_original_rerated['TOTAL_REDE'] = tbl_PLD_original_rerated['TRACKING_NUMBER'].map(tbl_PLD_original_REDE.set_index('TRACKING_NUMBER')['TOTAL_REDE'])
@@ -4108,9 +3884,7 @@ tbl_PLD_rerated_bestWay.loc[tbl_PLD_rerated_bestWay['SELECTED_SERVICE'] == 'TOTA
 tbl_PLD_rerated_bestWay.loc[tbl_PLD_rerated_bestWay['SELECTED_SERVICE'] == 'TOTAL_MIPH', 'SELECTED_SERVICE'] = 'MI Parcel Select Heavyweight'
 
 
-
-tbl_PLD_rerated_bestWay.to_csv('Nest_25%_BW.csv')
-
+tbl_PLD_rerated_bestWay.to_csv('test.csv')
 tbl_PLD_rerated_bestWay.shape
 
 # ******End******
